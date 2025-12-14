@@ -176,7 +176,7 @@ function applyFilters() {
     const filtered = allNFTs.filter(nft => {
         const name = (nft.name || "").toLowerCase();
         const tid = (nft.tokenid ?? nft.tokenId).toString();
-        // Atributları da axtarışa daxil etmək olar, amma hələlik ad və ID yetərlidir
+        
         const matchesSearch = name.includes(query) || tid.includes(query);
         
         if(!matchesSearch) return false;
@@ -423,9 +423,13 @@ function createCardElement(nft) {
     }
 
     const rInfo = rarityData[tokenid] || { rank: '?', type: 'common', traits: [] };
-    const icons = { mythic:'', legendary:'', epic:'', rare:'', common:'' };
-    const icon = icons[rInfo.type] || '';
     const rankLabel = rInfo.rank !== '?' ? ` #${rInfo.rank}` : `#${tokenid}`;
+    
+    // --- ICON MƏNTİQİ ---
+    let icon = "";
+    if (rInfo.type === 'legendary') icon = "";
+    else if (rInfo.type === 'epic') icon = "";
+    else if (rInfo.type === 'rare') icon = "";
 
     // --- ATRIBUT HTML GENERASIYASI ---
     let attrHTML = "";
@@ -435,16 +439,17 @@ function createCardElement(nft) {
         attrHTML = `<div class="attributes-grid">`;
         sortedTraits.forEach(t => {
             const pctVal = parseFloat(t.percent);
-            let pctColor = "#64748b"; 
-            if(pctVal < 1) pctColor = "#ef4444"; 
-            else if(pctVal < 5) pctColor = "#f59e0b"; 
+            let pctColor = "#64748b"; // Boz
+            
+            // Rəngləri faizə görə vizual olaraq fərqləndirmək
+            if(pctVal < 2) pctColor = "#f97316"; // Legendary rəngi
+            else if(pctVal < 10) pctColor = "#a855f7"; // Epic rəngi
+            else if(pctVal < 25) pctColor = "#3b82f6"; // Rare rəngi
 
-            // Escape quotes for safe HTML injection
             const safeType = t.trait_type.replace(/'/g, "\\'");
             const safeValue = t.value.replace(/'/g, "\\'");
             const safePercent = t.percent;
 
-            // ONCLICK: filtrləmə funksiyası
             attrHTML += `
                 <div class="trait-box" onclick="window.filterByAttribute('${safeType}', '${safeValue}', '${safePercent}', event)">
                     <div class="trait-type">${t.trait_type}</div>
@@ -491,7 +496,6 @@ function createCardElement(nft) {
         }
     }
 
-    // --- KARTIN YENİLƏNMİŞ HTML STRUKTURU (Gizli Atributlar) ---
     card.innerHTML = `
         <div class="rarity-badge ${rInfo.type}">
             <i>${icon}</i> <span>${rankLabel}</span>

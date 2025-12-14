@@ -178,7 +178,7 @@ async function main() {
       const batch = Array.from(
         { length: BATCH_SIZE },
         (_, j) => i + j
-      ).filter(id => id < totalSupply);
+      ).filter(id => id <= totalSupply);
 
       await Promise.allSettled(batch.map(tokenid => processNFT(tokenid)));
     }

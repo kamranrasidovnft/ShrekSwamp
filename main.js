@@ -33,6 +33,7 @@ let selectedTokens = new Set();
 let allNFTs = []; 
 let rarityData = {}; 
 let currentFilter = 'all'; 
+let currentSort = 'price_asc'; // Varsayılan sıralama
 
 // UI Elements
 const connectBtn = document.getElementById("connectBtn");
@@ -138,7 +139,7 @@ function orderToJsonSafe(obj) {
 }
 
 // ==========================================
-// 3. FILTR LOGIKASI
+// 3. FILTR VƏ SIRALAMA MƏNTİQİ
 // ==========================================
 
 window.setFilter = (filterType) => {
@@ -149,6 +150,11 @@ window.setFilter = (filterType) => {
     const activeBtn = Array.from(buttons).find(b => b.getAttribute('onclick').includes(filterType));
     if(activeBtn) activeBtn.classList.add('active');
 
+    applyFilters();
+};
+
+window.handleSortChange = (val) => {
+    currentSort = val;
     applyFilters();
 };
 
@@ -173,12 +179,12 @@ function updateFilterCounts() {
 function applyFilters() {
     const query = searchInput.value.toLowerCase();
     
-    const filtered = allNFTs.filter(nft => {
+    // 1. Filtrasiya
+    let filtered = allNFTs.filter(nft => {
         const name = (nft.name || "").toLowerCase();
         const tid = (nft.tokenid ?? nft.tokenId).toString();
         
         const matchesSearch = name.includes(query) || tid.includes(query);
-        
         if(!matchesSearch) return false;
 
         const price = parseFloat(nft.price || 0);
@@ -189,6 +195,43 @@ function applyFilters() {
         if (currentFilter === 'sold') return lastSale > 0;
         
         return true; 
+    });
+
+    // 2. SIRALAMA (Sorting)
+    filtered.sort((a, b) => {
+        const priceA = parseFloat(a.price || 0);
+        const priceB = parseFloat(b.price || 0);
+        const idA = parseInt(a.tokenid ?? a.tokenId);
+        const idB = parseInt(b.tokenid ?? b.tokenId);
+
+        // Nadirlik datalarını al (Rank yoxdursa 99999 qəbul edilir)
+        const rankA = (rarityData[idA] && rarityData[idA].rank) ? rarityData[idA].rank : 99999;
+        const rankB = (rarityData[idB] && rarityData[idB].rank) ? rarityData[idB].rank : 99999;
+
+        switch (currentSort) {
+            case 'price_asc': // Ucuzdan Bahaya
+                if (priceA > 0 && priceB === 0) return -1;
+                if (priceA === 0 && priceB > 0) return 1;
+                if (priceA > 0 && priceB > 0) return priceA - priceB;
+                return idA - idB;
+
+            case 'price_desc': // Bahadan Ucuza
+                if (priceA > 0 && priceB === 0) return -1;
+                if (priceA === 0 && priceB > 0) return 1;
+                return priceB - priceA;
+
+            case 'rarity_asc': // Ən Nadir (Rank 1 -> ...)
+                return rankA - rankB;
+
+            case 'rarity_desc': // Ən Adi
+                return rankB - rankA;
+
+            case 'id_asc': // ID Sırası
+                return idA - idB;
+
+            default:
+                return idA - idB;
+        }
     });
 
     renderNFTs(filtered);
@@ -354,17 +397,7 @@ async function loadData() {
     const data = await res.json();
     let rawList = data.nfts || [];
 
-    allNFTs = rawList.sort((a, b) => {
-        const priceA = parseFloat(a.price) || 0;
-        const priceB = parseFloat(b.price) || 0;
-        const idA = parseInt(a.tokenid);
-        const idB = parseInt(b.tokenid);
-
-        if (priceA > 0 && priceB === 0) return -1; 
-        if (priceA === 0 && priceB > 0) return 1;  
-        if (priceA > 0 && priceB > 0) return priceA - priceB;
-        return idA - idB;
-    });
+    allNFTs = rawList; // Sorting artıq applyFilters-də olur
 
     updateFilterCounts();
     applyFilters();
@@ -425,23 +458,19 @@ function createCardElement(nft) {
     const rInfo = rarityData[tokenid] || { rank: '?', type: 'common', traits: [] };
     const rankLabel = rInfo.rank !== '?' ? ` #${rInfo.rank}` : `#${tokenid}`;
     
-    // --- ICON MƏNTİQİ ---
-    let icon = "";
-    if (rInfo.type === 'legendary') icon = "";
-    else if (rInfo.type === 'epic') icon = "";
-    else if (rInfo.type === 'rare') icon = "";
+    let icon = ""; // Simvol istəsəniz bura əlavə edə bilərsiniz
 
     // --- ATRIBUT HTML GENERASIYASI ---
     let attrHTML = "";
     if (rInfo.traits && rInfo.traits.length > 0) {
-        const sortedTraits = rInfo.traits.sort((a,b) => b.score - a.score).slice(0, 4);
+        // .SLICE SİLİNDİ - BODY GÖRÜNƏCƏK
+        const sortedTraits = rInfo.traits.sort((a,b) => b.score - a.score);
         
         attrHTML = `<div class="attributes-grid">`;
         sortedTraits.forEach(t => {
             const pctVal = parseFloat(t.percent);
             let pctColor = "#64748b"; // Boz
             
-            // Rəngləri faizə görə vizual olaraq fərqləndirmək
             if(pctVal < 2) pctColor = "#f97316"; // Legendary rəngi
             else if(pctVal < 10) pctColor = "#a855f7"; // Epic rəngi
             else if(pctVal < 25) pctColor = "#3b82f6"; // Rare rəngi

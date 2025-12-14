@@ -3,7 +3,7 @@ window.Buffer = window.Buffer || Buffer;
 
 import { ethers } from "ethers";
 import { Seaport } from "@opensea/seaport-js";
-// YENİ: WalletConnect v2 Provider
+// WalletConnect v2 Provider
 import { EthereumProvider } from "https://esm.sh/@walletconnect/ethereum-provider@2.13.1";
 
 // ==========================================
@@ -48,7 +48,7 @@ let allNFTs = [];
 let rarityData = {}; 
 let currentFilter = 'all'; 
 let currentSort = 'price_asc'; 
-let targetPriceFilter = null;
+let targetPriceFilter = null; // USD Hədəf qiyməti
 
 // UI Elements
 const connectBtn = document.getElementById("connectBtn");
@@ -201,26 +201,35 @@ function applyFilters() {
         const name = (nft.name || "").toLowerCase();
         const tid = (nft.tokenid ?? nft.tokenId).toString();
         
+        // Axtarış Filteri
         const matchesSearch = name.includes(query) || tid.includes(query);
         if(!matchesSearch) return false;
 
         const price = parseFloat(nft.price || 0);
         const lastSale = parseFloat(nft.last_sale_price || 0);
 
+        // Status Filteri
         if (currentFilter === 'listed' && price <= 0) return false;
         if (currentFilter === 'unlisted' && (price > 0 || lastSale > 0)) return false;
         if (currentFilter === 'sold' && lastSale <= 0) return false;
 
+        // USD Hədəf Qiymət Filteri (±10%)
         if (targetPriceFilter !== null && apePriceUsd > 0) {
+            // Yalnız satışda olanlara baxırıq
             if (price <= 0) return false;
+
             const nftPriceInUsd = price * apePriceUsd;
-            const minPrice = targetPriceFilter * 0.9;
-            const maxPrice = targetPriceFilter * 1.1;
-            if (nftPriceInUsd < minPrice || nftPriceInUsd > maxPrice) return false;
+            const minPrice = targetPriceFilter * 0.9; // -10%
+            const maxPrice = targetPriceFilter * 1.1; // +10%
+
+            if (nftPriceInUsd < minPrice || nftPriceInUsd > maxPrice) {
+                return false;
+            }
         }
         return true; 
     });
 
+    // Siralama
     filtered.sort((a, b) => {
         const priceA = parseFloat(a.price || 0);
         const priceB = parseFloat(b.price || 0);
@@ -250,6 +259,7 @@ function applyFilters() {
     renderNFTs(filtered);
 }
 
+// Price Filter Event Listeners
 if(targetPriceInput) {
     targetPriceInput.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
@@ -373,10 +383,10 @@ window.connectInjected = async () => {
     }
 };
 
-// 4.2. WALLETCONNECT (MOBILE / QR)
+// 4.2. WALLETCONNECT (MOBILE / QR) - FIX: Metadata Əlavə Edildi
 window.connectWalletConnect = async () => {
-    if (WC_PROJECT_ID === "YOUR_PROJECT_ID_HERE") {
-        return alert("XƏTA: Zəhmət olmasa main.js faylında WC_PROJECT_ID dəyişəninə öz Project ID-ni yaz.");
+    if (typeof WC_PROJECT_ID === 'undefined' || WC_PROJECT_ID === "YOUR_PROJECT_ID_HERE" || WC_PROJECT_ID === "") {
+        return alert("XƏTA: Zəhmət olmasa main.js faylının əvvəlində WC_PROJECT_ID yerinə Project ID-nizi yazın.");
     }
 
     try {
@@ -386,6 +396,13 @@ window.connectWalletConnect = async () => {
             showQrModal: true,
             rpcMap: {
                 [APECHAIN_ID]: APECHAIN_RPC
+            },
+            // Metadata: Mobil cüzdanlar üçün vacibdir
+            metadata: {
+                name: "Ape Market",
+                description: "ApeChain NFT Marketplace",
+                url: window.location.origin, 
+                icons: ["https://cdn-icons-png.flaticon.com/512/6298/6298358.png"]
             }
         });
 
@@ -396,26 +413,28 @@ window.connectWalletConnect = async () => {
             await setupUserSession(wcProvider, accounts[0]);
         }
         
-        // WalletConnect sessiya bitəndə
         wcProvider.on("disconnect", () => {
             handleDisconnect();
         });
 
     } catch (err) {
         console.error("WalletConnect Error:", err);
-        // User modalı bağlayıbsa xəta verməsin
-        if (!err.message.includes("User closed modal")) {
+        if (err.message && !err.message.includes("User closed modal")) {
              alert("WalletConnect Xətası: " + err.message);
         }
     }
 };
 
 // Open Modal Button
-connectBtn.onclick = () => {
-    if(window.openWalletModal) window.openWalletModal();
-};
+if (connectBtn) {
+    connectBtn.onclick = () => {
+        if(window.openWalletModal) window.openWalletModal();
+    };
+}
 
-disconnectBtn.onclick = handleDisconnect;
+if (disconnectBtn) {
+    disconnectBtn.onclick = handleDisconnect;
+}
 
 // ==========================================
 // 5. DATA YÜKLƏMƏ

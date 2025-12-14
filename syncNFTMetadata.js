@@ -58,7 +58,7 @@ function convertIPFStoHTTP(uri) {
 }
 
 // =======================================================
-//   ⭐ UPDATED processNFT — LISTING TƏMİZLƏMƏ + SAHİBƏ BAXIŞ
+//   PROCESS NFT FUNCTION
 // =======================================================
 async function processNFT(tokenid) {
   try {
@@ -90,10 +90,10 @@ async function processNFT(tokenid) {
     try {
       const metadataRes = await fetch(httpURI);
       const metadata = await metadataRes.json();
-      name = metadata.name || `The Shrek #${tokenid}`;
+      name = metadata.name || `Steptract Genesis #${tokenid}`;
       image = metadata.image || httpURI;
     } catch {
-      name = `The Shrek #${tokenid}`;
+      name = `Steptract Genesis #${tokenid}`;
       image = httpURI;
     }
 
@@ -134,7 +134,7 @@ async function processNFT(tokenid) {
       name,
       image,
       updatedat: now,
-      createdat: now // upsert-də problem yaratmır
+      createdat: now 
     };
 
     // =============================

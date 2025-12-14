@@ -26,10 +26,10 @@
       --glass-border: rgba(255, 255, 255, 0.5);
 
       /* RARITY COLORS */
-      --legendary-color: #f97316;    /* Narıncı (Legendary) */
-      --epic-color: #a855f7;      /* Bənövşəyi (Epic) */
-      --rare-color: #3b82f6;      /* Mavi (Rare) */
-      --common-color: #94a3b8;    /* Boz (Common) */
+      --legendary-color: #f97316;
+      --epic-color: #a855f7;
+      --rare-color: #3b82f6;
+      --common-color: #94a3b8;
     }
 
     body {
@@ -51,11 +51,6 @@
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(-5px); }
       to { opacity: 1; transform: translateY(0); }
-    }
-    
-    @keyframes popIn {
-      from { opacity: 0; transform: scale(0.9); }
-      to { opacity: 1; transform: scale(1); }
     }
 
     /* =========================================
@@ -104,6 +99,7 @@
       cursor: pointer;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+      display: flex; align-items: center; gap: 8px; justify-content: center;
     }
     .wallet-btn:hover {
       transform: translateY(-2px);
@@ -117,6 +113,13 @@
       box-shadow: var(--shadow-sm);
     }
     .wallet-btn.disconnect:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+
+    .wallet-profile-btn {
+        background: white; color: var(--text-primary); border: 1px solid var(--border-color);
+        box-shadow: var(--shadow-sm); display: none; /* JS ilə açılacaq */
+    }
+    .wallet-profile-btn:hover { background: #f8fafc; border-color: var(--accent-color); color: var(--accent-color); }
+
 
     .view-toggle-btn {
         background: rgba(255,255,255,0.6);
@@ -270,7 +273,7 @@
         box-sizing: border-box;
     }
     .search-input.price-mode {
-        padding-left: 20px; 
+        padding-left: 20px;
     }
     .search-input:focus { border-color: var(--accent-color); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
     .search-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); opacity: 0.5; font-size: 18px;}
@@ -368,6 +371,7 @@
       margin-top: 15px;
     }
 
+    /* Attributes Grid */
     .attributes-grid {
         display: grid; 
         grid-template-columns: 1fr 1fr; 
@@ -430,6 +434,7 @@
       margin-top: auto;
     }
 
+    /* Action Inputs & Buttons */
     .card-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;}
 
     .mini-input {
@@ -513,7 +518,7 @@
     .cancel-icon:hover { background: #fee2e2; color: #ef4444; transform: rotate(90deg); }
 
     .bulk-controls {
-        display: none; 
+        display: none;
         align-items: center;
         gap: 8px;
         background: #f1f5f9;
@@ -568,36 +573,74 @@
       border-radius: var(--card-radius); height: 260px; border: none;
     }
     @keyframes loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-
+    
     /* =========================================
-       NEW: WALLET MODAL
+       WALLET MODAL (YENİ)
        ========================================= */
     .wallet-modal-overlay {
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.4); backdrop-filter: blur(5px);
-        z-index: 3000; display: none; align-items: center; justify-content: center;
+        background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(5px);
+        z-index: 9999; display: none; align-items: center; justify-content: center;
+        animation: fadeIn 0.3s ease;
     }
-    .wallet-modal {
-        background: white; padding: 25px; border-radius: 24px;
-        width: 100%; max-width: 400px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.15);
-        animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-    .wm-header {
-        display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
-    }
-    .wm-title { font-weight: 800; font-size: 20px; }
-    .wm-close { cursor: pointer; font-size: 24px; opacity: 0.5; transition: 0.2s; }
-    .wm-close:hover { opacity: 1; color: #ef4444; }
+    .wallet-modal-overlay.active { display: flex; }
 
-    .wm-option {
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 16px 20px; border: 1px solid var(--border-color); border-radius: 16px;
-        margin-bottom: 12px; cursor: pointer; transition: 0.2s;
+    .wallet-dashboard {
+        background: white; width: 90%; max-width: 400px;
+        border-radius: 24px; padding: 30px;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+        position: relative;
     }
-    .wm-option:hover { border-color: var(--accent-color); background: #f0f7ff; transform: translateY(-2px); }
-    .wm-icon { font-size: 24px; }
-    .wm-name { font-weight: 600; font-size: 15px; margin-right: auto; margin-left: 15px; }
+
+    .wd-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .wd-title { font-size: 20px; font-weight: 800; color: var(--text-primary); }
+    .wd-close { font-size: 24px; cursor: pointer; color: var(--text-secondary); transition: 0.2s; }
+    .wd-close:hover { color: #ef4444; transform: rotate(90deg); }
+
+    .wd-balance-card {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white; padding: 20px; border-radius: 16px;
+        text-align: center; margin-bottom: 20px;
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+    }
+    .wd-balance-label { font-size: 12px; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
+    .wd-balance-val { font-size: 32px; font-weight: 800; margin: 5px 0; }
+    .wd-address-mini { font-family: monospace; background: rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block; cursor: pointer; }
+
+    .wd-tabs { display: flex; gap: 10px; margin-bottom: 20px; background: #f1f5f9; padding: 4px; border-radius: 12px; }
+    .wd-tab-btn {
+        flex: 1; border: none; background: transparent; padding: 10px;
+        border-radius: 8px; font-weight: 600; color: var(--text-secondary);
+        cursor: pointer; transition: 0.2s;
+    }
+    .wd-tab-btn.active { background: white; color: var(--text-primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+    .wd-content { display: none; animation: fadeIn 0.3s ease; }
+    .wd-content.active { display: block; }
+
+    /* Send Form */
+    .wd-input-group { margin-bottom: 15px; }
+    .wd-label { font-size: 12px; font-weight: 600; margin-bottom: 5px; display: block; color: var(--text-secondary); }
+    .wd-input {
+        width: 100%; padding: 12px; border: 1px solid var(--border-color);
+        border-radius: 12px; outline: none; font-family: inherit; font-size: 14px;
+        box-sizing: border-box; background: #f8fafc;
+    }
+    .wd-input:focus { border-color: var(--accent-color); background: white; }
+
+    /* Receive QR Placeholder */
+    .qr-box {
+        background: white; border: 1px dashed var(--border-color);
+        border-radius: 16px; padding: 20px; text-align: center; margin-bottom: 15px;
+    }
+    .qr-img { width: 150px; height: 150px; background: #f1f5f9; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
+    
+    .copy-box {
+        display: flex; gap: 8px; align-items: center; background: #f1f5f9;
+        padding: 10px; border-radius: 10px; justify-content: space-between;
+    }
+    .full-addr { font-family: monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
+    .copy-icon { cursor: pointer; color: var(--accent-color); font-weight: bold; }
 
     /* RESPONSIVE */
     @media (max-width: 800px) {
@@ -632,6 +675,9 @@
             <span id="viewIcon">💻</span> <span id="viewText">Masaüstü</span>
         </button>
         <button class="wallet-btn" id="connectBtn">Connect Wallet</button>
+        <button class="wallet-btn wallet-profile-btn" id="walletProfileBtn" onclick="toggleWalletModal()">
+            Cüzdanım 💰
+        </button>
         <button class="wallet-btn disconnect" id="disconnectBtn" style="display:none;">Disconnect</button>
     </div>
   </nav>
@@ -731,23 +777,45 @@
     </div>
   </div>
 
-  <div id="walletModalOverlay" class="wallet-modal-overlay">
-      <div class="wallet-modal">
-          <div class="wm-header">
-              <div class="wm-title">Cüzdan Seçin</div>
-              <div class="wm-close" onclick="closeWalletModal()">✕</div>
-          </div>
-          
-          <div class="wm-option" onclick="connectInjected()">
-              <span class="wm-icon">🦊</span>
-              <span class="wm-name">Metamask / Browser Wallet</span>
-              <span style="color:#ccc">ᐳ</span>
+  <div class="wallet-modal-overlay" id="walletModalOverlay">
+      <div class="wallet-dashboard">
+          <div class="wd-header">
+              <div class="wd-title">Cüzdanım</div>
+              <div class="wd-close" onclick="toggleWalletModal()">✕</div>
           </div>
 
-          <div class="wm-option" onclick="connectWalletConnect()">
-              <span class="wm-icon">📡</span>
-              <span class="wm-name">WalletConnect (Mobil)</span>
-              <div style="font-size:10px; background:#e0f2fe; color:#3b82f6; padding:2px 6px; border-radius:6px;">QR Code</div>
+          <div class="wd-balance-card">
+              <div class="wd-balance-label">Mövcud Balans</div>
+              <div class="wd-balance-val" id="walletBalance">0.00 APE</div>
+              <div class="wd-address-mini" id="walletAddressMini" onclick="copyAddress()" title="Kopyala">0x00...0000 📋</div>
+          </div>
+
+          <div class="wd-tabs">
+              <button class="wd-tab-btn active" onclick="switchTab('send')">Göndər</button>
+              <button class="wd-tab-btn" onclick="switchTab('receive')">Qəbul et</button>
+          </div>
+
+          <div id="tab-send" class="wd-content active">
+              <div class="wd-input-group">
+                  <label class="wd-label">Kimə (Adres):</label>
+                  <input type="text" id="sendToAddr" class="wd-input" placeholder="0x...">
+              </div>
+              <div class="wd-input-group">
+                  <label class="wd-label">Məbləğ (APE):</label>
+                  <input type="number" id="sendAmount" class="wd-input" placeholder="0.0">
+              </div>
+              <button class="wallet-btn" style="width: 100%; justify-content: center;" onclick="sendCoin()">Göndər 🚀</button>
+          </div>
+
+          <div id="tab-receive" class="wd-content">
+              <div class="qr-box">
+                  <img id="qrImage" src="" alt="QR Code" style="width:150px; height:150px; border-radius:8px;">
+                  <p style="font-size:12px; color:#888; margin-top:10px;">Yalnız ApeChain (APE) göndərin</p>
+              </div>
+              <div class="copy-box">
+                  <span class="full-addr" id="fullWalletAddr">...</span>
+                  <span class="copy-icon" onclick="copyAddress()">KOPYALA</span>
+              </div>
           </div>
       </div>
   </div>
@@ -776,12 +844,6 @@
     }
     function toggleViewMode() { applyViewMode(currentMode === 'mobile' ? 'desktop' : 'mobile'); }
     applyViewMode(currentMode);
-
-    // Modal Logic
-    function openWalletModal() { document.getElementById('walletModalOverlay').style.display = 'flex'; }
-    function closeWalletModal() { document.getElementById('walletModalOverlay').style.display = 'none'; }
-    
-    // JS Functions will be attached from main.js
   </script>
 
   <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>

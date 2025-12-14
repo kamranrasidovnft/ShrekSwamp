@@ -31,7 +31,8 @@ let apePriceUsd = 0; // 1 APE = ? USD
 
 let selectedTokens = new Set();
 let allNFTs = []; 
-let currentFilter = 'all'; // Default filtr: hamısı
+let rarityData = {}; 
+let currentFilter = 'all'; 
 
 // UI Elements
 const connectBtn = document.getElementById("connectBtn");
@@ -55,7 +56,6 @@ const bulkListActions = document.getElementById("bulkListActions");
 const bulkBuyBtn = document.getElementById("bulkBuyBtn");
 const bulkTotalPriceEl = document.getElementById("bulkTotalPrice");
 
-// Input placeholder-i Dollar edirik
 if(bulkPriceInp) bulkPriceInp.placeholder = "Qiymət ($)";
 
 const searchInput = document.getElementById("searchInput");
@@ -80,7 +80,6 @@ function notify(msg, timeout = 4000) {
   }
 }
 
-// APE qiymətini çəkir (USD hesablamaq üçün)
 async function fetchApePrice() {
     try {
         const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=apecoin&vs_currencies=usd');
@@ -139,21 +138,17 @@ function orderToJsonSafe(obj) {
 }
 
 // ==========================================
-// 3. FILTR LOGIKASI (YENILENMIS)
+// 3. FILTR LOGIKASI
 // ==========================================
 
-// HTML-dən bu funksiyanı çağıracağıq (window obyektinə əlavə edirik)
 window.setFilter = (filterType) => {
     currentFilter = filterType;
-    
-    // UI düymələrini yenilə
     const buttons = document.querySelectorAll('.filter-btn');
     buttons.forEach(btn => btn.classList.remove('active'));
     
     const activeBtn = Array.from(buttons).find(b => b.getAttribute('onclick').includes(filterType));
     if(activeBtn) activeBtn.classList.add('active');
 
-    // Filtrləri tətbiq et
     applyFilters();
 };
 
@@ -162,11 +157,7 @@ function updateFilterCounts() {
 
     const total = allNFTs.length;
     const listed = allNFTs.filter(n => parseFloat(n.price) > 0).length;
-    
-    // Satılmış (tarixçəsi olanlar)
     const sold = allNFTs.filter(n => parseFloat(n.last_sale_price) > 0).length;
-
-    // YENI MENTIQ: Satışda olmayan (qiyməti 0 VƏ son satışı 0 olanlar)
     const unlisted = allNFTs.filter(n => {
         const p = parseFloat(n.price || 0);
         const ls = parseFloat(n.last_sale_price || 0);
@@ -183,25 +174,20 @@ function applyFilters() {
     const query = searchInput.value.toLowerCase();
     
     const filtered = allNFTs.filter(nft => {
-        // 1. Axtarış (Search) yoxlanışı
         const name = (nft.name || "").toLowerCase();
         const tid = (nft.tokenid ?? nft.tokenId).toString();
+        // Atributları da axtarışa daxil etmək olar, amma hələlik ad və ID yetərlidir
         const matchesSearch = name.includes(query) || tid.includes(query);
         
         if(!matchesSearch) return false;
 
-        // 2. Kateqoriya (Filter) yoxlanışı
         const price = parseFloat(nft.price || 0);
         const lastSale = parseFloat(nft.last_sale_price || 0);
 
         if (currentFilter === 'listed') return price > 0;
-        
-        // YENI MENTIQ: Satışda olmayan (qiyməti 0 VƏ son satışı 0)
         if (currentFilter === 'unlisted') return price === 0 && lastSale === 0;
-        
         if (currentFilter === 'sold') return lastSale > 0;
         
-        // 'all'
         return true; 
     });
 
@@ -224,7 +210,6 @@ function handleDisconnect() {
   addrSpan.style.display = "none";
   
   cancelBulk();
-  // Çıxış edəndə yenidən render et ki, "Sizin Listiniz" yazıları getsin
   applyFilters(); 
   notify("Çıxış edildi");
 }
@@ -345,7 +330,7 @@ async function fetchStats() {
     } catch(e) { console.error("Stats Error:", e); }
 }
 
-async function loadNFTs() {
+async function loadData() {
   selectedTokens.clear();
   updateBulkUI();
   fetchStats();
@@ -353,11 +338,22 @@ async function loadNFTs() {
   await fetchApePrice();
 
   try {
+      const rRes = await fetch('/rarity_data.json');
+      if (rRes.ok) {
+          rarityData = await rRes.json();
+          console.log("✅ Rarity Data Loaded.");
+      } else {
+          console.warn("⚠️ rarity_data.json tapılmadı.");
+      }
+  } catch(e) {
+      console.error("Rarity Load Error:", e);
+  }
+
+  try {
     const res = await fetch(`${BACKEND_URL}/api/nfts`);
     const data = await res.json();
     let rawList = data.nfts || [];
 
-    // Sorting Logic
     allNFTs = rawList.sort((a, b) => {
         const priceA = parseFloat(a.price) || 0;
         const priceB = parseFloat(b.price) || 0;
@@ -370,8 +366,8 @@ async function loadNFTs() {
         return idA - idB;
     });
 
-    updateFilterCounts(); // Tablardakı rəqəmləri yenilə
-    applyFilters();       // Ekrana bas
+    updateFilterCounts();
+    applyFilters();
   } catch (err) {
     console.error(err);
     marketplaceDiv.innerHTML = "<p style='color:red; text-align:center; grid-column:1/-1;'>Yüklənmə xətası.</p>";
@@ -379,7 +375,7 @@ async function loadNFTs() {
 }
 
 // ==========================================
-// 6. RENDER (INPUTLAR DOLLAR)
+// 6. RENDER (YENİLƏNMİŞ)
 // ==========================================
 
 function createCardElement(nft) {
@@ -393,11 +389,9 @@ function createCardElement(nft) {
     let priceVal = 0;
     let isListed = false;
 
-    // Listələnmiş (2 decimal formatda göstər)
     if (nft.price && parseFloat(nft.price) > 0) {
         priceVal = parseFloat(nft.price);
         isListed = true;
-        
         let usdText = "";
         if (apePriceUsd > 0) {
             const totalUsd = (priceVal * apePriceUsd).toFixed(2);
@@ -406,14 +400,11 @@ function createCardElement(nft) {
         displayPrice = `${priceVal.toFixed(2)} APE ${usdText}`;
     }
 
-    // Son satış
     let lastSoldHTML = "";
     if (!isListed && nft.last_sale_price && parseFloat(nft.last_sale_price) > 0) {
         const lsPrice = parseFloat(nft.last_sale_price);
         let lsUsd = "";
-        if (apePriceUsd > 0) {
-            lsUsd = `($${(lsPrice * apePriceUsd).toFixed(2)})`;
-        }
+        if (apePriceUsd > 0) lsUsd = `($${(lsPrice * apePriceUsd).toFixed(2)})`;
         lastSoldHTML = `<div style="font-size:12px; color:#888; margin-top:4px; font-weight:500;">Son satış: ${lsPrice.toFixed(2)} APE ${lsUsd}</div>`;
     }
 
@@ -431,8 +422,44 @@ function createCardElement(nft) {
         }
     }
 
+    const rInfo = rarityData[tokenid] || { rank: '?', type: 'common', traits: [] };
+    const icons = { mythic:'', legendary:'', epic:'', rare:'', common:'' };
+    const icon = icons[rInfo.type] || '';
+    const rankLabel = rInfo.rank !== '?' ? ` #${rInfo.rank}` : `#${tokenid}`;
+
+    // --- ATRIBUT HTML GENERASIYASI ---
+    let attrHTML = "";
+    if (rInfo.traits && rInfo.traits.length > 0) {
+        const sortedTraits = rInfo.traits.sort((a,b) => b.score - a.score).slice(0, 4);
+        
+        attrHTML = `<div class="attributes-grid">`;
+        sortedTraits.forEach(t => {
+            const pctVal = parseFloat(t.percent);
+            let pctColor = "#64748b"; 
+            if(pctVal < 1) pctColor = "#ef4444"; 
+            else if(pctVal < 5) pctColor = "#f59e0b"; 
+
+            // Escape quotes for safe HTML injection
+            const safeType = t.trait_type.replace(/'/g, "\\'");
+            const safeValue = t.value.replace(/'/g, "\\'");
+            const safePercent = t.percent;
+
+            // ONCLICK: filtrləmə funksiyası
+            attrHTML += `
+                <div class="trait-box" onclick="window.filterByAttribute('${safeType}', '${safeValue}', '${safePercent}', event)">
+                    <div class="trait-type">${t.trait_type}</div>
+                    <div class="trait-value" title="${t.value}">${t.value}</div>
+                    <div style="font-size:9px; color:${pctColor}; text-align:right;">${t.percent}</div>
+                </div>
+            `;
+        });
+        attrHTML += `</div>`;
+    } else {
+        attrHTML = `<div style="height:40px; display:flex; align-items:center; justify-content:center; color:#ccc; font-size:10px;">-</div>`;
+    }
+
     const card = document.createElement("div");
-    card.className = "nft-card";
+    card.className = `nft-card ${rInfo.type}`;
     card.id = `card-${tokenid}`; 
     card.style.height = "auto";
 
@@ -442,13 +469,12 @@ function createCardElement(nft) {
     if (isListed) {
         if (canManage) {
             actionsHTML = `
-                <div style="font-size:13px; color:#10b981; margin-bottom:5px; font-weight:600;">Sizin Listiniz: ${displayPrice}</div>
                 <input type="number" placeholder="Yeni Qiymət ($)" class="mini-input price-input" step="0.01">
                 <button class="action-btn btn-list update-btn" style="margin-top:8px;">Yenilə</button>
             `;
         } else {
             let btnText = `${priceVal.toFixed(2)} APE`; 
-            actionsHTML = `<button class="action-btn btn-buy buy-btn">Satın Al ${btnText}</button> <div style="text-align:center; font-size:11px; color:#666; margin-top:2px;">${apePriceUsd > 0 ? `~$${(priceVal * apePriceUsd).toFixed(2)}` : ''}</div>`;
+            actionsHTML = `<button class="action-btn btn-buy buy-btn">Satın Al ${btnText}</button>`;
         }
     } else {
         if (canManage) {
@@ -465,13 +491,27 @@ function createCardElement(nft) {
         }
     }
 
+    // --- KARTIN YENİLƏNMİŞ HTML STRUKTURU (Gizli Atributlar) ---
     card.innerHTML = `
+        <div class="rarity-badge ${rInfo.type}">
+            <i>${icon}</i> <span>${rankLabel}</span>
+        </div>
         ${checkboxHTML}
         <div class="card-content">
             <div class="card-title" title="${name}">${name}</div>
-            <div class="card-details">
-                 ${displayPrice && !canManage ? `<div class="price-val" style="display:flex; align-items:center; flex-wrap:wrap;">${displayPrice}</div>` : `<div style="height:24px"></div>`}
+            
+            <button class="toggle-attr-btn" onclick="window.toggleAttributes('${tokenid}', this, event)">
+                <span>Atributlar</span> <span>▼</span>
+            </button>
+            
+            <div id="attr-box-${tokenid}" class="hidden-attrs">
+                ${attrHTML}
             </div>
+
+            <div style="margin-top:auto; padding-top:5px;">
+                 ${displayPrice && !canManage ? `<div class="price-val" style="display:flex; align-items:center; flex-wrap:wrap;">${displayPrice}</div>` : ``}
+            </div>
+            
             <div class="card-actions" style="flex-direction:column; gap:4px;">
                 ${actionsHTML}
             </div>
@@ -492,7 +532,6 @@ function createCardElement(nft) {
         const btn = card.querySelector(".buy-btn");
         if(btn) btn.onclick = async () => await buyNFT(nft);
     } else {
-        // --- SATIŞ DÜYMƏSİ (DOLLAR -> 2 DECIMAL APE) ---
         const btn = card.querySelector(".list-btn") || card.querySelector(".update-btn");
         if(btn) {
             btn.onclick = async () => {
@@ -507,9 +546,8 @@ function createCardElement(nft) {
                     if (!apePriceUsd || apePriceUsd <= 0) return alert("APE məzənnəsi alınmadı. Yeniləyin.");
                 }
 
-                // Çevirmə və 2 rəqəmə qədər yuvarlaqlaşdırma
                 let apeAmount = parseFloat(usdInp) / apePriceUsd;
-                apeAmount = parseFloat(apeAmount.toFixed(2)); // <--- 2 RƏQƏM YUVARLAQ
+                apeAmount = parseFloat(apeAmount.toFixed(2));
 
                 if(apeAmount <= 0) return alert("Qiymət çox aşağıdır, APE miqdarı 0.00 olur.");
 
@@ -554,27 +592,23 @@ function refreshSingleCard(tokenid) {
     const nftData = allNFTs.find(n => n.tokenid == tokenid);
     if (!nftData) return;
     
-    updateFilterCounts(); // Tab sayğacını yenilə
+    updateFilterCounts(); 
 
     const oldCard = document.getElementById(`card-${tokenid}`);
     
-    // YENI MENTIQ: Əgər cari filtrə uyğun deyilsə kartı silirik
     const price = parseFloat(nftData.price || 0);
     const lastSale = parseFloat(nftData.last_sale_price || 0);
     let shouldShow = true;
     
     if (currentFilter === 'listed' && price === 0) shouldShow = false;
-    // Satışda olmayan (Unlisted): Price 0 VƏ LastSale 0 olmalıdır
     if (currentFilter === 'unlisted' && (price > 0 || lastSale > 0)) shouldShow = false;
     if (currentFilter === 'sold' && lastSale === 0) shouldShow = false;
     
-    // Əgər gizlənməlidirsə
     if (!shouldShow && oldCard) {
         oldCard.remove();
         return;
     }
 
-    // Əks halda yeniləyirik
     const newCard = createCardElement(nftData);
     if (newCard) newCard.style.animation = "none"; 
     if (oldCard && newCard) oldCard.replaceWith(newCard); 
@@ -638,7 +672,6 @@ window.cancelBulk = () => {
     updateBulkUI();
 };
 
-// --- BULK LISTING (DOLLAR -> 2 DECIMAL APE) ---
 if(bulkListBtn) {
     bulkListBtn.onclick = async () => {
         let usdVal = bulkPriceInp.value;
@@ -651,9 +684,8 @@ if(bulkListBtn) {
              if (!apePriceUsd || apePriceUsd <= 0) return alert("Məzənnə xətası. Yeniləyin.");
         }
 
-        // Çevirmə və yuvarlaqlaşdırma
         let apeAmount = parseFloat(usdVal) / apePriceUsd;
-        apeAmount = parseFloat(apeAmount.toFixed(2)); // <--- 2 RƏQƏM YUVARLAQ
+        apeAmount = parseFloat(apeAmount.toFixed(2)); 
 
         if(apeAmount <= 0) return alert("Qiymət çox aşağıdır, APE miqdarı 0.00 olur.");
 
@@ -729,7 +761,6 @@ async function bulkListNFTs(tokenIds, priceInApe) {
             const offerItem = order.parameters.offer[0];
             const tokenStr = offerItem.identifierOrCriteria;
 
-            // Baza'ya APE olaraq göndəririk (artıq yuvarlaqlaşdırılıb)
             await fetch(`${BACKEND_URL}/api/order`, {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -867,6 +898,44 @@ async function bulkBuyNFTs(tokenIds) {
     }
 }
 
+// ==========================================
+// 10. NEW FUNCTIONS (Attribute Logic)
+// ==========================================
+
+// Atributları Açan/Bağlayan Funksiya
+window.toggleAttributes = (id, btn, event) => {
+    if(event) event.stopPropagation();
+
+    const box = document.getElementById(`attr-box-${id}`);
+    const icon = btn.querySelector("span:last-child");
+
+    if (box.style.display === "block") {
+        box.style.display = "none";
+        icon.innerText = "▼";
+        btn.style.borderColor = "var(--border-color)";
+        btn.style.color = "var(--text-secondary)";
+    } else {
+        box.style.display = "block";
+        icon.innerText = "▲";
+        btn.style.borderColor = "var(--accent-color)";
+        btn.style.color = "var(--accent-color)";
+    }
+};
+
+// Atributa klikləyəndə işləyən funksiya
+window.filterByAttribute = (type, value, percent, event) => {
+    if(event) event.stopPropagation();
+
+    const searchInput = document.getElementById("searchInput");
+    if(searchInput) {
+        searchInput.value = value; 
+        applyFilters(); 
+    }
+
+    notify(`Filtrləndi: ${type} - ${value} (${percent})`);
+    window.scrollTo({ top: 100, behavior: 'smooth' });
+};
+
 // Initial Load
-loadNFTs();
-window.loadNFTs = loadNFTs;
+loadData();
+window.loadNFTs = loadData; 

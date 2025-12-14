@@ -22,7 +22,12 @@ app.use(express.json({ limit: "10mb" }));
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.join(__dirname, "dist");
+
+// 1. Statik faylları (Frontend) payla
 app.use(express.static(distPath));
+
+// 2. Rarity Data üçün xüsusi yol (Vite build edəndə json dist qovluğuna düşür)
+app.use('/rarity_data.json', express.static(path.join(distPath, 'rarity_data.json')));
 
 // =============================================
 // API ROUTES
@@ -55,22 +60,21 @@ app.get("/api/stats", async (req, res) => {
     }
 });
 
-// 2. NFT List
+// 2. NFT List API
 app.get("/api/nfts", async (req, res) => {
   const { data, error } = await supabase
     .from("metadata")
-    .select("*") // Bu last_sale_price sütununu da gətirəcək
+    .select("*") 
     .order("tokenid", { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
   res.json({ nfts: data });
 });
 
-// 3. Create Order
+// 3. Create Order API
 app.post("/api/order", async (req, res) => {
   const { tokenid, price, seller_address, seaport_order, order_hash } = req.body;
   if (!tokenid || !seaport_order) return res.status(400).json({ error: "Missing data" });
 
-  // Listələmə zamanı last_sale_price dəyişmir, sadəcə yeni qiymət qoyulur
   const { error } = await supabase.from("metadata").upsert({
     tokenid: tokenid.toString(),
     price: price,
@@ -88,7 +92,7 @@ app.post("/api/order", async (req, res) => {
   res.json({ success: true });
 });
 
-// 4. BUY COMPLETE (YENİLƏNDİ - last_sale_price LOGIC)
+// 4. BUY COMPLETE API
 app.post("/api/buy", async (req, res) => {
   const { tokenid, buyer_address, price, seller } = req.body;
   if (!tokenid || !buyer_address) return res.status(400).json({ error: "Missing buying data" });
@@ -97,8 +101,8 @@ app.post("/api/buy", async (req, res) => {
   const { error: metaError } = await supabase.from("metadata").update({
     buyer_address: buyer_address.toLowerCase(),
     seller_address: null, 
-    price: 0,                   // Satışdan çıxarılır
-    last_sale_price: price,     // <--- YENİ: Satış qiyməti tarixçəyə yazılır
+    price: 0,                   
+    last_sale_price: price,     
     seaport_order: null,
     order_hash: null,
     on_chain: true,
@@ -121,5 +125,7 @@ app.post("/api/buy", async (req, res) => {
   res.json({ success: true });
 });
 
+// Bütün digər sorğuları index.html-ə yönləndir (SPA)
 app.get("*", (req, res) => res.sendFile(path.join(distPath, "index.html")));
+
 app.listen(PORT, () => console.log(`🚀 Backend running on port ${PORT}`));

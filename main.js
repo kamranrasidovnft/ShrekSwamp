@@ -11,7 +11,7 @@ import { Seaport } from "@opensea/seaport-js";
 const ItemType = { NATIVE: 0, ERC20: 1, ERC721: 2, ERC1155: 3 };
 const OrderType = { FULL_OPEN: 0, PARTIAL_OPEN: 1, FULL_RESTRICTED: 2, PARTIAL_RESTRICTED: 3 };
 
-// Env Variables
+// Env Variables (və ya Default dəyərlər)
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL; 
 const NFT_CONTRACT_ADDRESS = import.meta.env.VITE_NFT_CONTRACT || "0xc291adb9516a1377bb0ab369ef240488adfaa4bc"; 
 const SEAPORT_ADDRESS = "0x0000000000000068f116a894984e2db1123eb395"; 
@@ -23,17 +23,17 @@ const APECHAIN_ID = 33139;
 const APECHAIN_ID_HEX = "0x8173";
 
 // OPTIMIZASIYA (INFINITE SCROLL) DƏYİŞƏNLƏRİ
-const BATCH_SIZE = 40; // Hər dəfə neçə NFT gəlsin
-let currentFilteredList = []; // Hal-hazırki siyahı
-let displayedCount = 0; // Ekranda neçəsi var
-let isLoadingMore = false; // Eyni anda iki dəfə yükləməsin deyə qoruma
+const BATCH_SIZE = 40; 
+let currentFilteredList = []; 
+let displayedCount = 0; 
+let isLoadingMore = false; 
 
 // Global Variables
 let provider = null;
 let signer = null;
 let seaport = null;
 let userAddress = null;
-let apePriceUsd = 0; // 1 APE = ? USD
+let apePriceUsd = 0; 
 
 let selectedTokens = new Set();
 let allNFTs = []; 
@@ -62,6 +62,8 @@ const bulkListBtn = document.getElementById("bulkListBtn");
 const bulkListActions = document.getElementById("bulkListActions");
 const bulkBuyBtn = document.getElementById("bulkBuyBtn");
 const bulkTotalPriceEl = document.getElementById("bulkTotalPrice");
+const bulkSelectionControls = document.getElementById("bulkSelectionControls"); // YENİ
+const targetRarityLabel = document.getElementById("targetRarityLabel"); // YENİ
 
 if(bulkPriceInp) bulkPriceInp.placeholder = "Qiymət ($)";
 
@@ -203,7 +205,7 @@ function applyFilters() {
         return true; 
     });
 
-    // 2. SIRALAMA (Sorting)
+    // 2. SIRALAMA
     filtered.sort((a, b) => {
         const priceA = parseFloat(a.price || 0);
         const priceB = parseFloat(b.price || 0);
@@ -214,28 +216,21 @@ function applyFilters() {
         const rankB = (rarityData[idB] && rarityData[idB].rank) ? rarityData[idB].rank : 99999;
 
         switch (currentSort) {
-            case 'price_asc': // Ucuzdan Bahaya
+            case 'price_asc': 
                 if (priceA > 0 && priceB === 0) return -1;
                 if (priceA === 0 && priceB > 0) return 1;
                 if (priceA > 0 && priceB > 0) return priceA - priceB;
                 return idA - idB;
 
-            case 'price_desc': // Bahadan Ucuza
+            case 'price_desc': 
                 if (priceA > 0 && priceB === 0) return -1;
                 if (priceA === 0 && priceB > 0) return 1;
                 return priceB - priceA;
 
-            case 'rarity_asc': // Ən Nadir (Rank 1 -> ...)
-                return rankA - rankB;
-
-            case 'rarity_desc': // Ən Adi
-                return rankB - rankA;
-
-            case 'id_asc': // ID Sırası
-                return idA - idB;
-
-            default:
-                return idA - idB;
+            case 'rarity_asc': return rankA - rankB;
+            case 'rarity_desc': return rankB - rankA;
+            case 'id_asc': return idA - idB;
+            default: return idA - idB;
         }
     });
 
@@ -463,6 +458,7 @@ function createCardElement(nft) {
     const rInfo = rarityData[tokenid] || { rank: '?', type: 'common', traits: [] };
     const rankLabel = rInfo.rank !== '?' ? ` #${rInfo.rank}` : `#${tokenid}`;
     
+    // Icon (Nümunə üçün)
     let icon = ""; 
 
     let attrHTML = "";
@@ -601,10 +597,6 @@ function createCardElement(nft) {
     return card;
 }
 
-// -----------------------------------------------------
-// YENİ RENDER LOGİKASI (INFINITE SCROLL)
-// -----------------------------------------------------
-
 function renderNFTs(list) {
     currentFilteredList = list;
     displayedCount = 0;
@@ -624,15 +616,13 @@ function renderNFTs(list) {
         return;
     }
 
-    // İlk partiyanı yüklə (40 dənə)
     loadMoreNFTs();
 }
 
 function loadMoreNFTs() {
-    // Əgər hazırda yüklənirsə və ya hamısı bitibsə dayandır
     if (isLoadingMore || displayedCount >= currentFilteredList.length) return;
 
-    isLoadingMore = true; // Kilidləyirik
+    isLoadingMore = true; 
 
     const nextCount = Math.min(displayedCount + BATCH_SIZE, currentFilteredList.length);
     const slice = currentFilteredList.slice(displayedCount, nextCount);
@@ -642,7 +632,6 @@ function loadMoreNFTs() {
     slice.forEach((nft) => {
         const cardElement = createCardElement(nft);
         if(cardElement) {
-            // Sadə fade effekti
             cardElement.style.animation = "fadeIn 0.4s ease forwards";
             fragment.appendChild(cardElement);
         }
@@ -651,19 +640,14 @@ function loadMoreNFTs() {
     marketplaceDiv.appendChild(fragment);
     displayedCount = nextCount;
 
-    // Kilidi açırıq (bir az gecikmə ilə, DOM otursun)
     setTimeout(() => {
         isLoadingMore = false;
     }, 100);
 }
 
-// -----------------------------------------------------
-// SCROLL LISTENER (SÜRÜŞDÜRMƏ HADİSƏSİ)
-// -----------------------------------------------------
+// SCROLL LISTENER
 window.addEventListener('scroll', () => {
-    // Səhifənin ən aşağısına 300px qalmış avtomatik yükləsin
     const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
-    
     if (scrollTop + clientHeight >= scrollHeight - 300) {
         loadMoreNFTs();
     }
@@ -701,13 +685,41 @@ if (searchInput) {
 }
 
 // ==========================================
-// 7. TOPLU UI & LOGIC
+// 7. TOPLU UI & LOGIC (YENILƏNMİŞ)
 // ==========================================
 
 function updateBulkUI() {
     if (selectedTokens.size > 0) {
         bulkBar.classList.add("active");
         bulkCount.textContent = `${selectedTokens.size} NFT seçildi`;
+
+        // YENI: İLK SEÇİLƏN ELEMENTİ TAP (RARITY LOGIC ÜÇÜN)
+        const firstTokenId = Array.from(selectedTokens)[0]; 
+        const firstNFT = allNFTs.find(n => n.tokenid == firstTokenId);
+        
+        let showControls = false;
+        let rarityType = "Common";
+
+        // Əgər istifadəçi öz NFT-sini seçibsə, +/- düymələrini göstər
+        if (firstNFT && userAddress && (
+            (firstNFT.seller_address && firstNFT.seller_address.toLowerCase() === userAddress) ||
+            (!firstNFT.seller_address && firstNFT.buyer_address && firstNFT.buyer_address.toLowerCase() === userAddress)
+           )) {
+            showControls = true;
+            if(rarityData[firstTokenId]) {
+                rarityType = rarityData[firstTokenId].type; // common, rare, etc.
+            }
+        }
+
+        if (showControls && bulkSelectionControls) {
+            bulkSelectionControls.style.display = "flex";
+            if(targetRarityLabel) {
+                targetRarityLabel.innerText = rarityType.charAt(0).toUpperCase() + rarityType.slice(1);
+                targetRarityLabel.style.color = `var(--${rarityType}-color)`; 
+            }
+        } else if (bulkSelectionControls) {
+            bulkSelectionControls.style.display = "none";
+        }
 
         let totalCostApe = 0;
         let allListed = true;
@@ -729,8 +741,10 @@ function updateBulkUI() {
         });
 
         if (allListed && validSelection && totalCostApe > 0) {
+            // BUY MODE
             bulkListActions.style.display = "none";
             bulkBuyBtn.style.display = "inline-block";
+            if(bulkSelectionControls) bulkSelectionControls.style.display = "none"; // Alış zamanı filter lazım deyil
             
             let totalUsdText = "";
             if (apePriceUsd > 0) {
@@ -739,6 +753,7 @@ function updateBulkUI() {
 
             bulkTotalPriceEl.innerHTML = `${totalCostApe.toFixed(2)} ${totalUsdText}`;
         } else {
+            // LIST MODE
             bulkListActions.style.display = "flex";
             bulkBuyBtn.style.display = "none";
         }
@@ -746,6 +761,77 @@ function updateBulkUI() {
         bulkBar.classList.remove("active");
     }
 }
+
+// YENİ FUNKSİYA: Toplu Artırma/Azaltma (Rarity-ə görə)
+window.modifySelection = (amount) => {
+    if (selectedTokens.size === 0) return;
+
+    // 1. Referans olaraq ilk seçiləni götürürük
+    const firstTokenId = Array.from(selectedTokens)[0];
+    const rInfo = rarityData[firstTokenId];
+    if (!rInfo) return;
+
+    const targetRarity = rInfo.type; // Məsələn: 'common'
+
+    // 2. İstifadəçinin cüzdanında olan və eyni rarity-də olan bütün NFT-ləri tapırıq
+    const candidates = allNFTs.filter(n => {
+        // Sahibini yoxla (seller_address və ya buyer_address ola bilər)
+        let isMine = false;
+        if (n.seller_address && n.seller_address.toLowerCase() === userAddress) isMine = true;
+        if (!n.seller_address && n.buyer_address && n.buyer_address.toLowerCase() === userAddress) isMine = true;
+        
+        const tokenRarity = rarityData[n.tokenid] ? rarityData[n.tokenid].type : 'common';
+        return isMine && tokenRarity === targetRarity;
+    });
+
+    if (amount > 0) {
+        // ƏLAVƏ ET
+        let addedCount = 0;
+        for (const nft of candidates) {
+            if (addedCount >= amount) break;
+            const tid = nft.tokenid.toString();
+            
+            if (!selectedTokens.has(tid)) {
+                selectedTokens.add(tid);
+                addedCount++;
+                // Checkbox-u DOM-da da işarələyək (əgər ekrandadırsa)
+                const chk = document.querySelector(`.select-box[data-id="${tid}"]`);
+                if(chk) chk.checked = true;
+            }
+        }
+        if(addedCount > 0) notify(`${addedCount} ədəd ${targetRarity} əlavə edildi`);
+        else notify(`Daha əlavə ediləcək ${targetRarity} yoxdur`);
+
+    } else {
+        // ÇIXAR (DESELECT)
+        let removeCount = Math.abs(amount);
+        let removed = 0;
+        
+        // Cəmi 1 dənə qalıbsa, və istifadəçi -1 basırsa onu da silə bilər.
+        // Tərsinə loop edirik
+        const currentSelectedCandidates = Array.from(selectedTokens).filter(tid => {
+            const tr = rarityData[tid] ? rarityData[tid].type : 'common';
+            return tr === targetRarity;
+        });
+
+        for (let i = currentSelectedCandidates.length - 1; i >= 0; i--) {
+            if (removed >= removeCount) break;
+            const tid = currentSelectedCandidates[i];
+            
+            // Xüsusi hal: Əgər hamısını silmək istəmiriksə sonuncunu saxlaya bilərik,
+            // amma standart UX: istənilən qədər silə bilsin.
+            // Əgər istifadəçi -50 basıbsa və cəmi 50 dənədirsə hamısı silinəcək və panel bağlanacaq.
+            
+            selectedTokens.delete(tid);
+            const chk = document.querySelector(`.select-box[data-id="${tid}"]`);
+            if(chk) chk.checked = false;
+            removed++;
+        }
+        notify(`${removed} ədəd çıxarıldı`);
+    }
+
+    updateBulkUI();
+};
 
 window.cancelBulk = () => {
     selectedTokens.clear();
@@ -983,7 +1069,6 @@ async function bulkBuyNFTs(tokenIds) {
 // 10. NEW FUNCTIONS (Attribute Logic)
 // ==========================================
 
-// Atributları Açan/Bağlayan Funksiya
 window.toggleAttributes = (id, btn, event) => {
     if(event) event.stopPropagation();
 
@@ -1003,7 +1088,6 @@ window.toggleAttributes = (id, btn, event) => {
     }
 };
 
-// Atributa klikləyəndə işləyən funksiya
 window.filterByAttribute = (type, value, percent, event) => {
     if(event) event.stopPropagation();
 

@@ -3,14 +3,6 @@ window.Buffer = window.Buffer || Buffer;
 
 import { ethers } from "ethers";
 import { Seaport } from "@opensea/seaport-js";
-// WalletConnect v2 Provider
-import { EthereumProvider } from "https://esm.sh/@walletconnect/ethereum-provider@2.13.1";
-
-// ==========================================
-// 0. CONFIGURATION (DƏYİŞDİRİN!)
-// ==========================================
-// WalletConnect Cloud-dan aldığınız Project ID-ni bura yazın:
-const WC_PROJECT_ID = "b19011d1632dc842997bb1278b2c886d"; 
 
 // ==========================================
 // 1. SABİTLƏR (CONSTANTS)
@@ -19,6 +11,7 @@ const WC_PROJECT_ID = "b19011d1632dc842997bb1278b2c886d";
 const ItemType = { NATIVE: 0, ERC20: 1, ERC721: 2, ERC1155: 3 };
 const OrderType = { FULL_OPEN: 0, PARTIAL_OPEN: 1, FULL_RESTRICTED: 2, PARTIAL_RESTRICTED: 3 };
 
+// Env Variables (və ya Default dəyərlər)
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL; 
 const NFT_CONTRACT_ADDRESS = import.meta.env.VITE_NFT_CONTRACT || "0xc291adb9516a1377bb0ab369ef240488adfaa4bc"; 
 const SEAPORT_ADDRESS = "0x0000000000000068f116a894984e2db1123eb395"; 
@@ -41,14 +34,13 @@ let signer = null;
 let seaport = null;
 let userAddress = null;
 let apePriceUsd = 0; 
-let wcProvider = null; // WalletConnect Provider Instance
 
 let selectedTokens = new Set();
 let allNFTs = []; 
 let rarityData = {}; 
 let currentFilter = 'all'; 
 let currentSort = 'price_asc'; 
-let targetPriceFilter = null; // USD Hədəf qiyməti
+let targetPriceFilter = null; 
 
 // UI Elements
 const connectBtn = document.getElementById("connectBtn");
@@ -180,6 +172,7 @@ window.handleSortChange = (val) => {
 
 function updateFilterCounts() {
     if(!countAllEl) return;
+
     const total = allNFTs.length;
     const listed = allNFTs.filter(n => parseFloat(n.price) > 0).length;
     const sold = allNFTs.filter(n => parseFloat(n.last_sale_price) > 0).length;
@@ -188,6 +181,7 @@ function updateFilterCounts() {
         const ls = parseFloat(n.last_sale_price || 0);
         return p === 0 && ls === 0;
     }).length;
+
     countAllEl.textContent = total;
     countListedEl.textContent = listed;
     countUnlistedEl.textContent = unlisted;
@@ -197,6 +191,7 @@ function updateFilterCounts() {
 function applyFilters() {
     const query = searchInput.value.toLowerCase();
     
+    // 1. Filtrasiya
     let filtered = allNFTs.filter(nft => {
         const name = (nft.name || "").toLowerCase();
         const tid = (nft.tokenid ?? nft.tokenId).toString();
@@ -213,9 +208,8 @@ function applyFilters() {
         if (currentFilter === 'unlisted' && (price > 0 || lastSale > 0)) return false;
         if (currentFilter === 'sold' && lastSale <= 0) return false;
 
-        // USD Hədəf Qiymət Filteri (±10%)
+        // YENI: PRICE TARGET FILTER (-+10%)
         if (targetPriceFilter !== null && apePriceUsd > 0) {
-            // Yalnız satışda olanlara baxırıq
             if (price <= 0) return false;
 
             const nftPriceInUsd = price * apePriceUsd;
@@ -226,10 +220,11 @@ function applyFilters() {
                 return false;
             }
         }
+        
         return true; 
     });
 
-    // Siralama
+    // 2. SIRALAMA
     filtered.sort((a, b) => {
         const priceA = parseFloat(a.price || 0);
         const priceB = parseFloat(b.price || 0);
@@ -245,10 +240,12 @@ function applyFilters() {
                 if (priceA === 0 && priceB > 0) return 1;
                 if (priceA > 0 && priceB > 0) return priceA - priceB;
                 return idA - idB;
+
             case 'price_desc': 
                 if (priceA > 0 && priceB === 0) return -1;
                 if (priceA === 0 && priceB > 0) return 1;
                 return priceB - priceA;
+
             case 'rarity_asc': return rankA - rankB;
             case 'rarity_desc': return rankB - rankA;
             case 'id_asc': return idA - idB;
@@ -259,7 +256,7 @@ function applyFilters() {
     renderNFTs(filtered);
 }
 
-// Price Filter Event Listeners
+// YENI: Price Input Event Listeners
 if(targetPriceInput) {
     targetPriceInput.addEventListener('input', (e) => {
         const val = parseFloat(e.target.value);
@@ -284,15 +281,10 @@ if(clearPriceBtn) {
 }
 
 // ==========================================
-// 4. CÜZDAN QOŞULMASI (METAMASK + WALLETCONNECT)
+// 4. CÜZDAN QOŞULMASI
 // ==========================================
 
-async function handleDisconnect() {
-  if (wcProvider) {
-      await wcProvider.disconnect();
-      wcProvider = null;
-  }
-  
+function handleDisconnect() {
   provider = null;
   signer = null;
   seaport = null;
@@ -300,6 +292,12 @@ async function handleDisconnect() {
 
   connectBtn.style.display = "inline-block";
   disconnectBtn.style.display = "none";
+  
+  // Wallet Profile Button gizlət
+  const walletProfileBtn = document.getElementById("walletProfileBtn");
+  if(walletProfileBtn) walletProfileBtn.style.display = "none";
+  document.getElementById('walletModalOverlay').style.display = "none";
+
   addrSpan.textContent = "";
   addrSpan.style.display = "none";
   
@@ -308,23 +306,15 @@ async function handleDisconnect() {
   notify("Çıxış edildi");
 }
 
-async function setupUserSession(ethProvider, address) {
-    userAddress = address.toLowerCase();
+async function setupUserSession(account) {
+    userAddress = account.toLowerCase();
 
-    // Provideri Ethers-ə çeviririk
-    provider = new ethers.providers.Web3Provider(ethProvider, "any");
-    signer = provider.getSigner();
-    
-    seaport = new Seaport(signer, { 
-        overrides: { contractAddress: SEAPORT_ADDRESS, defaultConduitKey: ZERO_BYTES32 } 
-    });
-
-    // Sign Typed Data Fix
-    if (signer && !signer.signTypedData) {
-        signer.signTypedData = async (domain, types, value) => {
-            const typesCopy = { ...types }; delete typesCopy.EIP712Domain; 
-            return await signer._signTypedData(domain, typesCopy, value);
-        };
+    if (window.ethereum) {
+        provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+        signer = provider.getSigner();
+        seaport = new Seaport(signer, { 
+            overrides: { contractAddress: SEAPORT_ADDRESS, defaultConduitKey: ZERO_BYTES32 } 
+        });
     }
 
     addrSpan.textContent = `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}`;
@@ -332,108 +322,96 @@ async function setupUserSession(ethProvider, address) {
     notify("Cüzdan qoşuldu!");
     
     connectBtn.style.display = "none";
+    
+    // Wallet Profile Button göstər
+    const walletProfileBtn = document.getElementById("walletProfileBtn");
+    if(walletProfileBtn) {
+        walletProfileBtn.style.display = "inline-flex";
+        walletProfileBtn.innerText = `Cüzdanım 💰`;
+    }
+
     disconnectBtn.style.display = "inline-block";
     
-    // Modalı bağla
-    if(window.closeWalletModal) window.closeWalletModal();
-
     cancelBulk();
     applyFilters();
+    setTimeout(updateWalletStats, 500); 
 }
 
 async function handleAccountsChanged(accounts) {
-  if (accounts.length === 0) handleDisconnect();
-  else setupUserSession(provider.provider, accounts[0]);
+  handleDisconnect();
 }
 
-// 4.1. BROWSER WALLET (METAMASK)
-window.connectInjected = async () => {
-    try {
-        if (!window.ethereum) return alert("Metamask tapılmadı!");
-        
-        // Şəbəkəni yoxla
-        const tmpProvider = new ethers.providers.Web3Provider(window.ethereum, "any");
-        const { chainId } = await tmpProvider.getNetwork();
-        
-        if (chainId !== APECHAIN_ID) {
-            try {
-                await window.ethereum.request({
-                    method: "wallet_addEthereumChain",
-                    params: [{
-                        chainId: APECHAIN_ID_HEX, chainName: "ApeChain Mainnet",
-                        nativeCurrency: { name: "APE", symbol: "APE", decimals: 18 },
-                        rpcUrls: [APECHAIN_RPC],
-                        blockExplorerUrls: ["https://apescan.io"],
-                    }],
-                });
-            } catch (e) { return alert("ApeChain şəbəkəsinə keçilmədi."); }
-        }
-
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-        if (accounts.length > 0) {
-            await setupUserSession(window.ethereum, accounts[0]);
-        }
-
-        window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
-        window.ethereum.on("accountsChanged", handleAccountsChanged);
-
-    } catch (err) {
-        console.error(err);
-        if (err.code !== 4001) alert("Xəta: " + err.message);
-    }
-};
-
-// 4.2. WALLETCONNECT (MOBILE / QR) - FIX: Metadata Əlavə Edildi
-window.connectWalletConnect = async () => {
-    if (typeof WC_PROJECT_ID === 'undefined' || WC_PROJECT_ID === "YOUR_PROJECT_ID_HERE" || WC_PROJECT_ID === "") {
-        return alert("XƏTA: Zəhmət olmasa main.js faylının əvvəlində WC_PROJECT_ID yerinə Project ID-nizi yazın.");
+async function connectWallet() {
+  try {
+    if (!window.ethereum) return alert("Metamask tapılmadı!");
+    
+    provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+    
+    const { chainId } = await provider.getNetwork();
+    if (chainId !== APECHAIN_ID) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: APECHAIN_ID_HEX, chainName: "ApeChain Mainnet",
+            nativeCurrency: { name: "APE", symbol: "APE", decimals: 18 },
+            rpcUrls: [APECHAIN_RPC],
+            blockExplorerUrls: ["https://apescan.io"],
+          }],
+        });
+        provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      } catch (e) { return alert("ApeChain şəbəkəsinə keçilmədi."); }
     }
 
-    try {
-        wcProvider = await EthereumProvider.init({
-            projectId: WC_PROJECT_ID,
-            chains: [APECHAIN_ID],
-            showQrModal: true,
-            rpcMap: {
-                [APECHAIN_ID]: APECHAIN_RPC
-            },
-            // Metadata: Mobil cüzdanlar üçün vacibdir
-            metadata: {
-                name: "Ape Market",
-                description: "ApeChain NFT Marketplace",
-                url: window.location.origin, 
-                icons: ["https://cdn-icons-png.flaticon.com/512/6298/6298358.png"]
+    const accounts = await provider.send("eth_requestAccounts", []);
+    
+    if (accounts.length > 0) {
+        await setupUserSession(accounts[0]);
+    }
+
+    if (signer && !signer.signTypedData) {
+        signer.signTypedData = async (domain, types, value) => {
+            const typesCopy = { ...types }; delete typesCopy.EIP712Domain; 
+            return await signer._signTypedData(domain, typesCopy, value);
+        };
+    }
+
+    window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
+    window.ethereum.on("accountsChanged", handleAccountsChanged);
+
+  } catch (err) { 
+      console.error(err);
+      if (err.code !== 4001) { 
+          alert("Connect xətası: " + err.message); 
+      }
+  }
+}
+
+disconnectBtn.onclick = handleDisconnect;
+connectBtn.onclick = connectWallet;
+
+async function ensureWalletConnection() {
+    if (signer && seaport) return true;
+    if (window.ethereum && window.ethereum.selectedAddress) {
+        try {
+            provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+            signer = provider.getSigner();
+            seaport = new Seaport(signer, { 
+                overrides: { contractAddress: SEAPORT_ADDRESS, defaultConduitKey: ZERO_BYTES32 } 
+            });
+             if (signer && !signer.signTypedData) {
+                signer.signTypedData = async (domain, types, value) => {
+                    const typesCopy = { ...types }; delete typesCopy.EIP712Domain; 
+                    return await signer._signTypedData(domain, typesCopy, value);
+                };
             }
-        });
-
-        await wcProvider.enable();
-        
-        const accounts = wcProvider.accounts;
-        if (accounts.length > 0) {
-            await setupUserSession(wcProvider, accounts[0]);
-        }
-        
-        wcProvider.on("disconnect", () => {
-            handleDisconnect();
-        });
-
-    } catch (err) {
-        console.error("WalletConnect Error:", err);
-        if (err.message && !err.message.includes("User closed modal")) {
-             alert("WalletConnect Xətası: " + err.message);
+            return true;
+        } catch (e) {
+            console.error("Bərpa xətası:", e);
+            return false;
         }
     }
-};
-
-// Open Modal Button
-if (connectBtn) {
-    connectBtn.onclick = () => {
-        if(window.openWalletModal) window.openWalletModal();
-    };
-}
-
-if (disconnectBtn) {
-    disconnectBtn.onclick = handleDisconnect;
+    return false;
 }
 
 // ==========================================
@@ -764,7 +742,7 @@ if (searchInput) {
 }
 
 // ==========================================
-// 7. TOPLU UI & LOGIC
+// 7. TOPLU UI & LOGIC (YENILƏNMİŞ)
 // ==========================================
 
 function updateBulkUI() {
@@ -818,9 +796,10 @@ function updateBulkUI() {
         });
 
         if (allListed && validSelection && totalCostApe > 0) {
+            // BUY MODE
             bulkListActions.style.display = "none";
             bulkBuyBtn.style.display = "inline-block";
-            if(bulkSelectionControls) bulkSelectionControls.style.display = "none";
+            if(bulkSelectionControls) bulkSelectionControls.style.display = "none"; 
             
             let totalUsdText = "";
             if (apePriceUsd > 0) {
@@ -829,6 +808,7 @@ function updateBulkUI() {
 
             bulkTotalPriceEl.innerHTML = `${totalCostApe.toFixed(2)} ${totalUsdText}`;
         } else {
+            // LIST MODE
             bulkListActions.style.display = "flex";
             bulkBuyBtn.style.display = "none";
         }
@@ -839,11 +819,13 @@ function updateBulkUI() {
 
 window.modifySelection = (amount) => {
     if (selectedTokens.size === 0) return;
+
     const firstTokenId = Array.from(selectedTokens)[0];
     const rInfo = rarityData[firstTokenId];
     if (!rInfo) return;
 
-    const targetRarity = rInfo.type; 
+    const targetRarity = rInfo.type;
+
     const candidates = allNFTs.filter(n => {
         let isMine = false;
         if (n.seller_address && n.seller_address.toLowerCase() === userAddress) isMine = true;
@@ -858,6 +840,7 @@ window.modifySelection = (amount) => {
         for (const nft of candidates) {
             if (addedCount >= amount) break;
             const tid = nft.tokenid.toString();
+            
             if (!selectedTokens.has(tid)) {
                 selectedTokens.add(tid);
                 addedCount++;
@@ -866,9 +849,12 @@ window.modifySelection = (amount) => {
             }
         }
         if(addedCount > 0) notify(`${addedCount} ədəd ${targetRarity} əlavə edildi`);
+        else notify(`Daha əlavə ediləcək ${targetRarity} yoxdur`);
+
     } else {
         let removeCount = Math.abs(amount);
         let removed = 0;
+        
         const currentSelectedCandidates = Array.from(selectedTokens).filter(tid => {
             const tr = rarityData[tid] ? rarityData[tid].type : 'common';
             return tr === targetRarity;
@@ -877,6 +863,7 @@ window.modifySelection = (amount) => {
         for (let i = currentSelectedCandidates.length - 1; i >= 0; i--) {
             if (removed >= removeCount) break;
             const tid = currentSelectedCandidates[i];
+            
             selectedTokens.delete(tid);
             const chk = document.querySelector(`.select-box[data-id="${tid}"]`);
             if(chk) chk.checked = false;
@@ -884,6 +871,7 @@ window.modifySelection = (amount) => {
         }
         notify(`${removed} ədəd çıxarıldı`);
     }
+
     updateBulkUI();
 };
 
@@ -924,7 +912,7 @@ if(bulkBuyBtn) {
 }
 
 // ==========================================
-// 8. LISTING & BUYING (UNIVERSAL PROVIDER ILƏ)
+// 8. LISTING FUNCTIONS
 // ==========================================
 
 async function listNFT(tokenid, priceInApe) {
@@ -933,6 +921,7 @@ async function listNFT(tokenid, priceInApe) {
 }
 
 async function bulkListNFTs(tokenIds, priceInApe) {
+    await ensureWalletConnection();
     if (!signer || !seaport) return alert("Cüzdan qoşulmayıb! Zəhmət olmasa 'Connect Wallet' düyməsinə basın.");
     
     let priceWeiString;
@@ -1012,6 +1001,10 @@ async function bulkListNFTs(tokenIds, priceInApe) {
     }
 }
 
+// ==========================================
+// 9. BUY FUNCTIONS
+// ==========================================
+
 async function buyNFT(nftRecord) {
     selectedTokens.clear();
     selectedTokens.add(nftRecord.tokenid.toString());
@@ -1019,6 +1012,7 @@ async function buyNFT(nftRecord) {
 }
 
 async function bulkBuyNFTs(tokenIds) {
+    await ensureWalletConnection();
     if (!signer || !seaport) return alert("Cüzdan qoşulmayıb! Zəhmət olmasa 'Connect Wallet' düyməsinə basın.");
     
     const buyerAddress = await signer.getAddress();
@@ -1147,6 +1141,89 @@ window.filterByAttribute = (type, value, percent, event) => {
 
     notify(`Filtrləndi: ${type} - ${value} (${percent})`);
     window.scrollTo({ top: 100, behavior: 'smooth' });
+};
+
+// ==========================================
+// 11. CÜZDAN DASHBOARD (YENİ)
+// ==========================================
+
+window.toggleWalletModal = async () => {
+    const modal = document.getElementById('walletModalOverlay');
+    if (modal.style.display === 'flex') {
+        modal.style.display = 'none';
+    } else {
+        if(!userAddress) return alert("Əvvəlcə cüzdanı qoşun!");
+        await updateWalletStats();
+        modal.style.display = 'flex';
+    }
+};
+
+window.switchTab = (tabName) => {
+    document.querySelectorAll('.wd-tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.wd-content').forEach(c => c.classList.remove('active'));
+    
+    const activeBtn = document.querySelector(`.wd-tab-btn[onclick="switchTab('${tabName}')"]`);
+    if(activeBtn) activeBtn.classList.add('active');
+    
+    document.getElementById(`tab-${tabName}`).classList.add('active');
+};
+
+async function updateWalletStats() {
+    if(!provider || !userAddress) return;
+
+    try {
+        const balanceBN = await provider.getBalance(userAddress);
+        const balanceEth = ethers.utils.formatEther(balanceBN);
+        const formatBal = parseFloat(balanceEth).toFixed(4);
+        
+        document.getElementById('walletBalance').innerText = `${formatBal} APE`;
+    } catch (e) {
+        console.error("Balans xətası:", e);
+    }
+
+    const shortAddr = `${userAddress.slice(0,6)}...${userAddress.slice(-4)}`;
+    document.getElementById('walletAddressMini').innerText = `${shortAddr} 📋`;
+    document.getElementById('fullWalletAddr').innerText = userAddress;
+
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${userAddress}`;
+    document.getElementById('qrImage').src = qrUrl;
+}
+
+window.sendCoin = async () => {
+    const toAddr = document.getElementById('sendToAddr').value;
+    const amount = document.getElementById('sendAmount').value;
+
+    if(!ethers.utils.isAddress(toAddr)) return notify("Yanlış adres formatı!");
+    if(!amount || parseFloat(amount) <= 0) return notify("Yanlış məbləğ!");
+
+    try {
+        notify("Tranzaksiya hazırlanır...");
+        const tx = await signer.sendTransaction({
+            to: toAddr,
+            value: ethers.utils.parseEther(amount)
+        });
+        
+        notify("Təsdiqlənir... Gözləyin");
+        await tx.wait();
+        
+        notify("Uğurla göndərildi! 🚀");
+        updateWalletStats(); 
+        
+        document.getElementById('sendToAddr').value = "";
+        document.getElementById('sendAmount').value = "";
+        
+    } catch (error) {
+        console.error(error);
+        if(error.code === 'INSUFFICIENT_FUNDS') notify("Balans kifayət etmir!");
+        else notify("Xəta baş verdi: " + error.message.slice(0, 20));
+    }
+};
+
+window.copyAddress = () => {
+    if(userAddress) {
+        navigator.clipboard.writeText(userAddress);
+        notify("Adres kopyalandı! ✅");
+    }
 };
 
 // Initial Load

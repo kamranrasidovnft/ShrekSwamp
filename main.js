@@ -40,6 +40,7 @@ let allNFTs = [];
 let rarityData = {}; 
 let currentFilter = 'all'; 
 let currentSort = 'price_asc'; 
+let targetPriceFilter = null; // YENI: USD hədəf qiyməti
 
 // UI Elements
 const connectBtn = document.getElementById("connectBtn");
@@ -62,12 +63,15 @@ const bulkListBtn = document.getElementById("bulkListBtn");
 const bulkListActions = document.getElementById("bulkListActions");
 const bulkBuyBtn = document.getElementById("bulkBuyBtn");
 const bulkTotalPriceEl = document.getElementById("bulkTotalPrice");
-const bulkSelectionControls = document.getElementById("bulkSelectionControls"); // YENİ
-const targetRarityLabel = document.getElementById("targetRarityLabel"); // YENİ
+const bulkSelectionControls = document.getElementById("bulkSelectionControls"); 
+const targetRarityLabel = document.getElementById("targetRarityLabel"); 
 
 if(bulkPriceInp) bulkPriceInp.placeholder = "Qiymət ($)";
 
 const searchInput = document.getElementById("searchInput");
+const targetPriceInput = document.getElementById("targetPriceInput"); // YENI
+const clearPriceBtn = document.getElementById("clearPriceBtn"); // YENI
+
 const totalVolEl = document.getElementById("totalVol");
 const dayVolEl = document.getElementById("dayVol");
 const itemsCountEl = document.getElementById("itemsCount");
@@ -192,15 +196,31 @@ function applyFilters() {
         const name = (nft.name || "").toLowerCase();
         const tid = (nft.tokenid ?? nft.tokenId).toString();
         
+        // Axtarış Filteri
         const matchesSearch = name.includes(query) || tid.includes(query);
         if(!matchesSearch) return false;
 
         const price = parseFloat(nft.price || 0);
         const lastSale = parseFloat(nft.last_sale_price || 0);
 
-        if (currentFilter === 'listed') return price > 0;
-        if (currentFilter === 'unlisted') return price === 0 && lastSale === 0;
-        if (currentFilter === 'sold') return lastSale > 0;
+        // Status Filteri
+        if (currentFilter === 'listed' && price <= 0) return false;
+        if (currentFilter === 'unlisted' && (price > 0 || lastSale > 0)) return false;
+        if (currentFilter === 'sold' && lastSale <= 0) return false;
+
+        // YENI: PRICE TARGET FILTER (-+10%)
+        if (targetPriceFilter !== null && apePriceUsd > 0) {
+            // Yalnız satışda olanlara baxırıq qiymət filtri üçün
+            if (price <= 0) return false;
+
+            const nftPriceInUsd = price * apePriceUsd;
+            const minPrice = targetPriceFilter * 0.9; // -10%
+            const maxPrice = targetPriceFilter * 1.1; // +10%
+
+            if (nftPriceInUsd < minPrice || nftPriceInUsd > maxPrice) {
+                return false;
+            }
+        }
         
         return true; 
     });
@@ -235,6 +255,31 @@ function applyFilters() {
     });
 
     renderNFTs(filtered);
+}
+
+// YENI: Price Input Event Listeners
+if(targetPriceInput) {
+    targetPriceInput.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        if (val && val > 0) {
+            targetPriceFilter = val;
+            clearPriceBtn.style.display = 'flex';
+            // Avtomatik "Satışda olan" tabına keçmək yaxşı olardı, amma istifadəçi bəlkə hamısını istəyir
+        } else {
+            targetPriceFilter = null;
+            clearPriceBtn.style.display = 'none';
+        }
+        applyFilters();
+    });
+}
+
+if(clearPriceBtn) {
+    clearPriceBtn.onclick = () => {
+        targetPriceInput.value = "";
+        targetPriceFilter = null;
+        clearPriceBtn.style.display = 'none';
+        applyFilters();
+    };
 }
 
 // ==========================================

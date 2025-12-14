@@ -5,10 +5,10 @@ import axios from 'axios';
 // KONFİQURASİYA
 // ==========================================
 const CID = "QmW8hYi9DHd3BSMtiCe2uTDFymz43HtQSVpMPiDiupaVY3";
-const TOTAL_SUPPLY = 2222;
+const TOTAL_SUPPLY = 2222; // Sizin istədiyiniz say
 const FILE_PATH = 'public/rarity_data.json';
 
-// Gateway Siyahısı (Biri işləməsə digərinə keçəcək)
+// Gateway Siyahısı
 const GATEWAYS = [
     "https://dweb.link/ipfs/",
     "https://ipfs.io/ipfs/",
@@ -23,11 +23,10 @@ async function fetchMetadata(id) {
     for (const gateway of GATEWAYS) {
         try {
             const url = `${gateway}${CID}/${id}.json`;
-            // 5 saniyə vaxt qoyuruq
             const { data } = await axios.get(url, { timeout: 5000 });
             return data;
         } catch (err) {
-            await sleep(1000); // 1 saniyə gözləyib yenidən yoxlayır
+            await sleep(1000); 
             continue;
         }
     }
@@ -41,7 +40,7 @@ async function generateRarity() {
         fs.mkdirSync('public');
     }
 
-    // 1. KÖHNƏ DATANI YÜKLƏ (Qaldığı yerdən davam etmək üçün)
+    // 1. KÖHNƏ DATANI YÜKLƏ
     let finalMap = {};
     if (fs.existsSync(FILE_PATH)) {
         try {
@@ -58,7 +57,6 @@ async function generateRarity() {
 
     // 2. METADATA YÜKLƏMƏ DÖVRÜ
     for (let i = 1; i <= TOTAL_SUPPLY; i++) {
-        // Əgər bu ID artıq doludursa, təkrar yükləmə
         if (finalMap[i] && finalMap[i].raw_attributes && finalMap[i].raw_attributes.length > 0) {
             continue; 
         }
@@ -66,7 +64,6 @@ async function generateRarity() {
         const data = await fetchMetadata(i);
 
         if (data) {
-            // Sizin atributları birbaşa yadda saxlayırıq
             finalMap[i] = {
                 id: i,
                 raw_attributes: data.attributes || [] 
@@ -76,17 +73,14 @@ async function generateRarity() {
         } else {
             failCount++;
             console.error(`❌ Failed #${i}`);
-            // Boş yazırıq ki, skript dayanmasın (sonra düzəldilə bilər)
             if (!finalMap[i]) finalMap[i] = { id: i, raw_attributes: [] }; 
         }
 
-        // Hər 20 NFT-dən bir yaddaşa yaz (Backup)
         if (i % 20 === 0) {
             saveProgress(finalMap);
             console.log(`💾 Yadda saxlanıldı #${i}. Uğurlu: ${successCount}, Xəta: ${failCount}`);
         }
 
-        // Serveri yormamaq üçün fasilə
         await sleep(100); 
     }
 
@@ -99,13 +93,12 @@ async function generateRarity() {
     console.log("✅ Proses bitdi! 'public/rarity_data.json' hazırdır.");
 }
 
-// RANK HESABLAMA MƏNTİQİ
+// RANK HESABLAMA MƏNTİQİ (SİZİN OPENSEA RANGELƏRİNİZ)
 function calculateRanks(mapData) {
     let allNFTs = Object.values(mapData);
     let traitCounts = {};
 
-    // 1. Sayğac: Hər xüsusiyyətdən neçə dənə var?
-    // Məsələn: "Background||Serena Dale" -> 50 ədəd
+    // A. Bütün traitlərin sayını tapırıq
     allNFTs.forEach(nft => {
         const attrs = nft.raw_attributes || [];
         attrs.forEach(attr => {
@@ -116,7 +109,7 @@ function calculateRanks(mapData) {
         });
     });
 
-    // 2. Score verilməsi
+    // B. Hər NFT üçün "Rarity Score" hesablayırıq
     allNFTs.forEach(nft => {
         let totalScore = 0;
         let processedTraits = [];
@@ -127,11 +120,11 @@ function calculateRanks(mapData) {
                 const key = `${attr.trait_type}||${attr.value}`;
                 const count = traitCounts[key] || 0;
                 
-                // Faiz (Məsələn 0.05 = 5%)
+                // Faiz (0.01 = 1%)
                 const percentRaw = count > 0 ? (count / TOTAL_SUPPLY) : 0;
                 const percentDisplay = (percentRaw * 100).toFixed(1) + "%";
                 
-                // Score = 1 / faiz (Nadir olanın balı yüksək olur)
+                // Nadirlik balı (OpenSea stili: Trait Rarity Score)
                 let score = 0;
                 if(percentRaw > 0) score = 1 / percentRaw;
                 
@@ -150,22 +143,32 @@ function calculateRanks(mapData) {
         nft.traits = processedTraits;
     });
 
-    // 3. Sıralama (Rank) - Ən çox bal yığan Rank 1
+    // C. Sıralama (Rank) - Ən çox bal yığan Rank 1 olur
     allNFTs.sort((a, b) => (b.totalScore || 0) - (a.totalScore || 0));
 
-    // 4. Type təyini (Mythic, Legendary...)
+    // D. Type Təyini (SİZİN TƏLƏB ETDİYİNİZ INTERVAL)
     allNFTs.forEach((nft, index) => {
         const rank = index + 1;
-        let type = "common";
+        let type = "common"; 
         
-        // Sizin bölgüyə əsasən
-        if (rank <= 22) type = "mythic";
-        else if (rank <= 132) type = "legendary";
-        else if (rank <= 462) type = "epic";
-        else if (rank <= 1122) type = "rare";
-        else type = "common";
+        // Rank 1 - 22: Legendary
+        if (rank <= 22) {
+            type = "legendary"; 
+        } 
+        // Rank 23 - 222: Epic
+        else if (rank <= 222) {
+            type = "epic";      
+        } 
+        // Rank 223 - 555: Rare
+        else if (rank <= 555) {
+            type = "rare";      
+        } 
+        // Rank 556 - 2222: Common
+        else {
+            type = "common";    
+        }
 
-        // Map-ə yazırıq (ID əsasında)
+        // Map-ə yazırıq
         mapData[nft.id] = {
             rank: rank,
             type: type,

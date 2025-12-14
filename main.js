@@ -13,7 +13,7 @@ const OrderType = { FULL_OPEN: 0, PARTIAL_OPEN: 1, FULL_RESTRICTED: 2, PARTIAL_R
 
 // Env Variables
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL; 
-const NFT_CONTRACT_ADDRESS = import.meta.env.VITE_NFT_CONTRACT || "0xf62049dd99d8a1fa57a31ce091282b2628acc301"; 
+const NFT_CONTRACT_ADDRESS = import.meta.env.VITE_NFT_CONTRACT || "0xc291adb9516a1377bb0ab369ef240488adfaa4bc"; 
 const SEAPORT_ADDRESS = "0x0000000000000068f116a894984e2db1123eb395"; 
 const APECHAIN_RPC = import.meta.env.VITE_APECHAIN_RPC || "https://rpc.apechain.com";
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta id="viewportMeta" name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ApeChain Marketplace</title>
+  <title>Steptract Market</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
   <style>
@@ -15,7 +15,7 @@
       --card-bg: #ffffff;
       --text-primary: #1a1d1e;
       --text-secondary: #8a939b;
-      --accent-color: #3b82f6; /* Parlaq Mavi */
+      --accent-color: #3b82f6;
       --accent-hover: #2563eb;
       --green-color: #10b981;
       --border-color: #eef2f6;
@@ -25,12 +25,11 @@
       --glass-bg: rgba(255, 255, 255, 0.85);
       --glass-border: rgba(255, 255, 255, 0.5);
 
-      /* RARITY COLORS (MoonRank Style) */
-      --mythic-color: #ef4444;    /* Rank 1-22 */
-      --legend-color: #f59e0b;    /* Rank 23-132 */
-      --epic-color: #a855f7;      /* Rank 133-462 */
-      --rare-color: #3b82f6;      /* Rank 463-1122 */
-      --common-color: #94a3b8;    /* Rank 1123+ */
+      /* RARITY COLORS (Sizin tələbə əsasən) */
+      --legend-color: #f97316;    /* Narıncı (Legendary) */
+      --epic-color: #a855f7;      /* Bənövşəyi (Epic) */
+      --rare-color: #3b82f6;      /* Mavi (Rare) */
+      --common-color: #94a3b8;    /* Boz (Common) */
     }
 
     body {
@@ -55,7 +54,7 @@
     }
 
     /* =========================================
-       2. NAVBAR (GLASSMORPHISM)
+       2. NAVBAR
        ========================================= */
     .navbar {
       display: flex;
@@ -293,13 +292,12 @@
     }
 
     /* Rarity Border Colors */
-    .nft-card.mythic { border: 1px solid var(--mythic-color); box-shadow: 0 4px 20px rgba(239, 68, 68, 0.15); }
-    .nft-card.legendary { border: 1px solid var(--legend-color); box-shadow: 0 4px 15px rgba(245, 158, 11, 0.15); }
-    .nft-card.epic { border: 1px solid var(--epic-color); }
+    .nft-card.legendary { border: 1px solid var(--legend-color); box-shadow: 0 4px 15px rgba(249, 115, 22, 0.15); }
+    .nft-card.epic { border: 1px solid var(--epic-color); box-shadow: 0 4px 15px rgba(168, 85, 247, 0.15); }
     .nft-card.rare { border: 1px solid var(--rare-color); }
     .nft-card.common { border: 1px solid var(--border-color); }
 
-    /* Rarity Badge */
+    /* Rarity Badge - YENİLƏNMİŞ RƏNGLƏR */
     .rarity-badge {
         position: absolute; top: 10px; left: 10px;
         padding: 4px 10px; border-radius: 8px;
@@ -309,11 +307,15 @@
         backdrop-filter: blur(8px);
         box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    .rarity-badge.mythic { background: linear-gradient(135deg, #ef4444, #b91c1c); border: 1px solid #fca5a5; }
-    .rarity-badge.legendary { background: linear-gradient(135deg, #f59e0b, #d97706); border: 1px solid #fcd34d; }
+    
+    /* NARINCI */
+    .rarity-badge.legendary { background: linear-gradient(135deg, #f97316, #ea580c); border: 1px solid #fdba74; }
+    /* BƏNÖVŞƏYİ */
     .rarity-badge.epic { background: linear-gradient(135deg, #a855f7, #7e22ce); border: 1px solid #d8b4fe; }
+    /* MAVİ */
     .rarity-badge.rare { background: linear-gradient(135deg, #3b82f6, #2563eb); border: 1px solid #93c5fd; }
-    .rarity-badge.common { background: rgba(148, 163, 184, 0.9); color: #f1f5f9; }
+    /* BOZ */
+    .rarity-badge.common { background: rgba(100, 116, 139, 0.95); color: #f8fafc; border: 1px solid #cbd5e1; }
 
     .card-content {
       padding: 24px;
@@ -328,10 +330,10 @@
       font-size: 18px;
       color: var(--text-primary);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-      margin-top: 15px; /* Badge üçün yer */
+      margin-top: 15px;
     }
 
-    /* --- YENİLƏNMİŞ ATRIBUT CSS --- */
+    /* Attributes Grid */
     .attributes-grid {
         display: grid; 
         grid-template-columns: 1fr 1fr; 
@@ -346,13 +348,12 @@
         font-size: 10px; 
         display: flex; 
         flex-direction: column;
-        /* YENİ: İnteraktivlik */
         cursor: pointer;
         transition: all 0.2s ease;
         user-select: none;
     }
     .trait-box:hover {
-        background: #e0f2fe; /* Açıq mavi fon */
+        background: #e0f2fe; 
         border-color: #3b82f6; 
         transform: translateY(-2px);
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
@@ -365,9 +366,8 @@
     .trait-value { 
         color: #334155; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .nft-card.mythic .trait-box { background: #fff1f2; border-color: #fecaca; }
-
-    /* --- YENİLƏNMİŞ: GİZLİ ATRIBUTLAR ÜÇÜN STİLLƏR --- */
+    
+    /* Toggle Button */
     .toggle-attr-btn {
         background: transparent;
         border: 1px dashed var(--border-color);
@@ -383,7 +383,7 @@
         background: rgba(59, 130, 246, 0.05);
     }
     .hidden-attrs {
-        display: none; /* Standart olaraq gizli */
+        display: none; 
         margin-top: 10px;
         animation: fadeIn 0.3s ease;
     }

@@ -25,7 +25,7 @@
       --glass-bg: rgba(255, 255, 255, 0.85);
       --glass-border: rgba(255, 255, 255, 0.5);
 
-      /* RARITY COLORS (Sizin tələbə əsasən) */
+      /* RARITY COLORS */
       --legend-color: #f97316;    /* Narıncı (Legendary) */
       --epic-color: #a855f7;      /* Bənövşəyi (Epic) */
       --rare-color: #3b82f6;      /* Mavi (Rare) */
@@ -229,7 +229,7 @@
     }
 
     /* =========================================
-       CONTROLS & SEARCH
+       CONTROLS & SEARCH & SORT
        ========================================= */
     .controls-bar {
       display: flex;
@@ -257,6 +257,22 @@
     }
     .search-input:focus { border-color: var(--accent-color); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
     .search-icon { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); opacity: 0.5; font-size: 18px;}
+
+    /* YENİ SORT STİLİ */
+    .sort-wrapper { min-width: 200px; }
+    
+    .sort-dropdown {
+        width: 100%; padding: 14px 20px;
+        border-radius: 16px; border: 1px solid var(--border-color);
+        background: white; color: var(--text-primary);
+        font-size: 14px; font-weight: 500; font-family: 'Poppins', sans-serif;
+        outline: none; cursor: pointer; box-shadow: var(--shadow-sm);
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a939b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat; background-position: right 15px center; background-size: 16px;
+        transition: all 0.3s;
+    }
+    .sort-dropdown:focus { border-color: var(--accent-color); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
 
     /* =========================================
        MARKETPLACE GRID
@@ -503,6 +519,8 @@
         .bulk-input { flex-grow: 1; width: auto; }
         .view-toggle-btn span#viewText { display: none; }
         .filter-container { padding-bottom: 10px; }
+        
+        .sort-wrapper { width: 100%; order: 3; }
     }
   </style>
 </head>
@@ -558,9 +576,20 @@
             <div id="notice">Marketplace-ə xoş gəldiniz</div>
             <div id="addr"></div>
         </div>
+        
         <div class="search-wrapper">
             <span class="search-icon">🔍</span>
             <input type="text" id="searchInput" class="search-input" placeholder="NFT adı və ya ID axtar...">
+        </div>
+
+        <div class="sort-wrapper">
+            <select id="sortSelect" onchange="handleSortChange(this.value)" class="sort-dropdown">
+                <option value="price_asc">Qiymət: Ucuzdan Bahaya</option>
+                <option value="price_desc">Qiymət: Bahadan Ucuza</option>
+                <option value="rarity_asc">Nadirlik: Ən Nadir</option>
+                <option value="rarity_desc">Nadirlik: Ən Adi</option>
+                <option value="id_asc">ID: Yenidən Köhnəyə</option>
+            </select>
         </div>
     </div>
 

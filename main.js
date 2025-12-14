@@ -22,6 +22,12 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const APECHAIN_ID = 33139;
 const APECHAIN_ID_HEX = "0x8173";
 
+// OPTIMIZASIYA (INFINITE SCROLL) DƏYİŞƏNLƏRİ
+const BATCH_SIZE = 40; // Hər dəfə neçə NFT gəlsin
+let currentFilteredList = []; // Hal-hazırki siyahı
+let displayedCount = 0; // Ekranda neçəsi var
+let isLoadingMore = false; // Eyni anda iki dəfə yükləməsin deyə qoruma
+
 // Global Variables
 let provider = null;
 let signer = null;
@@ -33,7 +39,7 @@ let selectedTokens = new Set();
 let allNFTs = []; 
 let rarityData = {}; 
 let currentFilter = 'all'; 
-let currentSort = 'price_asc'; // Varsayılan sıralama
+let currentSort = 'price_asc'; 
 
 // UI Elements
 const connectBtn = document.getElementById("connectBtn");
@@ -204,7 +210,6 @@ function applyFilters() {
         const idA = parseInt(a.tokenid ?? a.tokenId);
         const idB = parseInt(b.tokenid ?? b.tokenId);
 
-        // Nadirlik datalarını al (Rank yoxdursa 99999 qəbul edilir)
         const rankA = (rarityData[idA] && rarityData[idA].rank) ? rarityData[idA].rank : 99999;
         const rankB = (rarityData[idB] && rarityData[idB].rank) ? rarityData[idB].rank : 99999;
 
@@ -397,7 +402,7 @@ async function loadData() {
     const data = await res.json();
     let rawList = data.nfts || [];
 
-    allNFTs = rawList; // Sorting artıq applyFilters-də olur
+    allNFTs = rawList; 
 
     updateFilterCounts();
     applyFilters();
@@ -408,7 +413,7 @@ async function loadData() {
 }
 
 // ==========================================
-// 6. RENDER (YENİLƏNMİŞ)
+// 6. RENDER (OPTIMIZASIYA + INFINITE SCROLL)
 // ==========================================
 
 function createCardElement(nft) {
@@ -458,22 +463,20 @@ function createCardElement(nft) {
     const rInfo = rarityData[tokenid] || { rank: '?', type: 'common', traits: [] };
     const rankLabel = rInfo.rank !== '?' ? ` #${rInfo.rank}` : `#${tokenid}`;
     
-    let icon = ""; // Simvol istəsəniz bura əlavə edə bilərsiniz
+    let icon = ""; 
 
-    // --- ATRIBUT HTML GENERASIYASI ---
     let attrHTML = "";
     if (rInfo.traits && rInfo.traits.length > 0) {
-        // .SLICE SİLİNDİ - BODY GÖRÜNƏCƏK
         const sortedTraits = rInfo.traits.sort((a,b) => b.score - a.score);
         
         attrHTML = `<div class="attributes-grid">`;
         sortedTraits.forEach(t => {
             const pctVal = parseFloat(t.percent);
-            let pctColor = "#64748b"; // Boz
+            let pctColor = "#64748b"; 
             
-            if(pctVal < 2) pctColor = "#f97316"; // Legendary rəngi
-            else if(pctVal < 10) pctColor = "#a855f7"; // Epic rəngi
-            else if(pctVal < 25) pctColor = "#3b82f6"; // Rare rəngi
+            if(pctVal < 2) pctColor = "#f97316"; 
+            else if(pctVal < 10) pctColor = "#a855f7"; 
+            else if(pctVal < 25) pctColor = "#3b82f6"; 
 
             const safeType = t.trait_type.replace(/'/g, "\\'");
             const safeValue = t.value.replace(/'/g, "\\'");
@@ -496,6 +499,9 @@ function createCardElement(nft) {
     card.className = `nft-card ${rInfo.type}`;
     card.id = `card-${tokenid}`; 
     card.style.height = "auto";
+    card.style.opacity = "1";
+    card.style.transform = "none";
+    card.style.animation = "none";
 
     let checkboxHTML = canSelect ? `<input type="checkbox" class="select-box" data-id="${tokenid}">` : "";
 
@@ -595,9 +601,16 @@ function createCardElement(nft) {
     return card;
 }
 
+// -----------------------------------------------------
+// YENİ RENDER LOGİKASI (INFINITE SCROLL)
+// -----------------------------------------------------
+
 function renderNFTs(list) {
-    marketplaceDiv.innerHTML = "";
+    currentFilteredList = list;
+    displayedCount = 0;
+    
     if (itemsCountEl) itemsCountEl.innerText = list.length;
+    marketplaceDiv.innerHTML = "";
 
     if (list.length === 0) {
         marketplaceDiv.innerHTML = `
@@ -611,15 +624,51 @@ function renderNFTs(list) {
         return;
     }
 
-    list.forEach((nft, index) => {
+    // İlk partiyanı yüklə (40 dənə)
+    loadMoreNFTs();
+}
+
+function loadMoreNFTs() {
+    // Əgər hazırda yüklənirsə və ya hamısı bitibsə dayandır
+    if (isLoadingMore || displayedCount >= currentFilteredList.length) return;
+
+    isLoadingMore = true; // Kilidləyirik
+
+    const nextCount = Math.min(displayedCount + BATCH_SIZE, currentFilteredList.length);
+    const slice = currentFilteredList.slice(displayedCount, nextCount);
+
+    const fragment = document.createDocumentFragment();
+
+    slice.forEach((nft) => {
         const cardElement = createCardElement(nft);
         if(cardElement) {
-            const delay = Math.min(index * 0.05, 1.0); 
-            cardElement.style.animationDelay = `${delay}s`;
-            marketplaceDiv.appendChild(cardElement);
+            // Sadə fade effekti
+            cardElement.style.animation = "fadeIn 0.4s ease forwards";
+            fragment.appendChild(cardElement);
         }
     });
+
+    marketplaceDiv.appendChild(fragment);
+    displayedCount = nextCount;
+
+    // Kilidi açırıq (bir az gecikmə ilə, DOM otursun)
+    setTimeout(() => {
+        isLoadingMore = false;
+    }, 100);
 }
+
+// -----------------------------------------------------
+// SCROLL LISTENER (SÜRÜŞDÜRMƏ HADİSƏSİ)
+// -----------------------------------------------------
+window.addEventListener('scroll', () => {
+    // Səhifənin ən aşağısına 300px qalmış avtomatik yükləsin
+    const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
+    
+    if (scrollTop + clientHeight >= scrollHeight - 300) {
+        loadMoreNFTs();
+    }
+});
+
 
 function refreshSingleCard(tokenid) {
     const nftData = allNFTs.find(n => n.tokenid == tokenid);
@@ -632,20 +681,19 @@ function refreshSingleCard(tokenid) {
     const price = parseFloat(nftData.price || 0);
     const lastSale = parseFloat(nftData.last_sale_price || 0);
     let shouldShow = true;
-    
     if (currentFilter === 'listed' && price === 0) shouldShow = false;
     if (currentFilter === 'unlisted' && (price > 0 || lastSale > 0)) shouldShow = false;
     if (currentFilter === 'sold' && lastSale === 0) shouldShow = false;
     
-    if (!shouldShow && oldCard) {
+    if (oldCard && !shouldShow) {
         oldCard.remove();
         return;
     }
 
     const newCard = createCardElement(nftData);
-    if (newCard) newCard.style.animation = "none"; 
-    if (oldCard && newCard) oldCard.replaceWith(newCard); 
-    else if (!oldCard && newCard && shouldShow) marketplaceDiv.appendChild(newCard); 
+    if (oldCard && newCard && shouldShow) {
+        oldCard.replaceWith(newCard);
+    }
 }
 
 if (searchInput) {

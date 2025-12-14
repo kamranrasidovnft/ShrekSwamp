@@ -4,7 +4,7 @@ import axios from 'axios';
 // ==========================================
 // KONFİQURASİYA
 // ==========================================
-const CID = "QmawxnmmzngbiYe1PSgc9YEthFX11uiTtT6YPdUdLD3x3E";
+const CID = "QmW8hYi9DHd3BSMtiCe2uTDFymz43HtQSVpMPiDiupaVY3";
 const TOTAL_SUPPLY = 2222;
 const FILE_PATH = 'public/rarity_data.json';
 

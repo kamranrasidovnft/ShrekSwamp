@@ -8,6 +8,9 @@ import { Seaport } from "@opensea/seaport-js";
 // 1. SABİTLƏR (CONSTANTS)
 // ==========================================
 
+// *** OWNER ADDRESS *** (Bura öz cüzdan adresinizi yazın ki, airdrop-u idarə edə biləsiniz)
+const OWNER_ADDRESS = "0x038c54d6059446bbcdb51a5ded7c120803c00886"; 
+
 const ItemType = { NATIVE: 0, ERC20: 1, ERC721: 2, ERC1155: 3 };
 const OrderType = { FULL_OPEN: 0, PARTIAL_OPEN: 1, FULL_RESTRICTED: 2, PARTIAL_RESTRICTED: 3 };
 
@@ -41,6 +44,10 @@ let rarityData = {};
 let currentFilter = 'all'; 
 let currentSort = 'price_asc'; 
 let targetPriceFilter = null; 
+
+// Airdrop Vars
+let airdropInterval = null;
+const AIRDROP_LIMIT = 200;
 
 // UI Elements
 const connectBtn = document.getElementById("connectBtn");
@@ -207,8 +214,16 @@ function applyFilters() {
         if (currentFilter === 'listed' && price <= 0) return false;
         if (currentFilter === 'unlisted' && (price > 0 || lastSale > 0)) return false;
         if (currentFilter === 'sold' && lastSale <= 0) return false;
+        
+        // My Collection Filter (Menyudan gələn xüsusi filtr)
+        if (currentFilter === 'my_collection') {
+            if(!userAddress) return false;
+            const isSeller = nft.seller_address && nft.seller_address.toLowerCase() === userAddress;
+            const isBuyer = nft.buyer_address && nft.buyer_address.toLowerCase() === userAddress;
+            if(!isSeller && !isBuyer) return false;
+        }
 
-        // YENI: PRICE TARGET FILTER (-+10%)
+        // PRICE TARGET FILTER (-+10%)
         if (targetPriceFilter !== null && apePriceUsd > 0) {
             if (price <= 0) return false;
 
@@ -293,16 +308,23 @@ function handleDisconnect() {
   connectBtn.style.display = "inline-block";
   disconnectBtn.style.display = "none";
   
-  // Wallet Profile Button gizlət
-  const walletProfileBtn = document.getElementById("walletProfileBtn");
-  if(walletProfileBtn) walletProfileBtn.style.display = "none";
+  // Close Modals
   document.getElementById('walletModalOverlay').style.display = "none";
+  document.getElementById('airdropModalOverlay').style.display = "none";
+  document.getElementById('mainMenu').classList.remove('active');
 
   addrSpan.textContent = "";
   addrSpan.style.display = "none";
   
   cancelBulk();
-  applyFilters(); 
+  
+  // Reset filter if was on my collection
+  if(currentFilter === 'my_collection') {
+      window.setFilter('all');
+  } else {
+      applyFilters();
+  }
+  
   notify("Çıxış edildi");
 }
 
@@ -322,17 +344,19 @@ async function setupUserSession(account) {
     notify("Cüzdan qoşuldu!");
     
     connectBtn.style.display = "none";
-    
-    // Wallet Profile Button göstər
-    const walletProfileBtn = document.getElementById("walletProfileBtn");
-    if(walletProfileBtn) {
-        walletProfileBtn.style.display = "inline-flex";
-        walletProfileBtn.innerText = `Cüzdanım 💰`;
-    }
-
     disconnectBtn.style.display = "inline-block";
     
     cancelBulk();
+    
+    // Check Owner for Airdrop Controls
+    if(userAddress === OWNER_ADDRESS.toLowerCase()) {
+        const ctrl = document.getElementById('ownerControls');
+        if(ctrl) ctrl.style.display = 'block';
+    } else {
+        const ctrl = document.getElementById('ownerControls');
+        if(ctrl) ctrl.style.display = 'none';
+    }
+
     applyFilters();
     setTimeout(updateWalletStats, 500); 
 }
@@ -725,6 +749,11 @@ function refreshSingleCard(tokenid) {
     if (currentFilter === 'listed' && price === 0) shouldShow = false;
     if (currentFilter === 'unlisted' && (price > 0 || lastSale > 0)) shouldShow = false;
     if (currentFilter === 'sold' && lastSale === 0) shouldShow = false;
+    if (currentFilter === 'my_collection') {
+        const isMine = (nftData.seller_address && nftData.seller_address.toLowerCase() === userAddress) ||
+                       (nftData.buyer_address && nftData.buyer_address.toLowerCase() === userAddress);
+        if(!isMine) shouldShow = false;
+    }
     
     if (oldCard && !shouldShow) {
         oldCard.remove();
@@ -742,7 +771,7 @@ if (searchInput) {
 }
 
 // ==========================================
-// 7. TOPLU UI & LOGIC (YENILƏNMİŞ)
+// 7. TOPLU UI & LOGIC
 // ==========================================
 
 function updateBulkUI() {
@@ -1144,11 +1173,43 @@ window.filterByAttribute = (type, value, percent, event) => {
 };
 
 // ==========================================
-// 11. CÜZDAN DASHBOARD (YENİ)
+// 11. CÜZDAN DASHBOARD & MENU LOGIC (YENİ)
 // ==========================================
 
+// MENU LOGIC
+window.toggleMenu = (e) => {
+    if(e) e.stopPropagation();
+    const menu = document.getElementById('mainMenu');
+    menu.classList.toggle('active');
+};
+
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('mainMenu');
+    const btn = document.querySelector('.menu-btn-dots');
+    if (menu.classList.contains('active') && !menu.contains(e.target) && !btn.contains(e.target)) {
+        menu.classList.remove('active');
+    }
+});
+
+// KOLLEKSIYA FILTRI
+window.filterMyCollection = () => {
+    if (!userAddress) return alert("Əvvəlcə cüzdanı qoşun!");
+    
+    // Set UI tabs to none/custom
+    const buttons = document.querySelectorAll('.filter-btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    currentFilter = 'my_collection';
+    applyFilters();
+    notify("Sizin kolleksiyanız yükləndi");
+    document.getElementById('mainMenu').classList.remove('active');
+};
+
+// WALLET MODAL
 window.toggleWalletModal = async () => {
     const modal = document.getElementById('walletModalOverlay');
+    document.getElementById('mainMenu').classList.remove('active');
+    
     if (modal.style.display === 'flex') {
         modal.style.display = 'none';
     } else {
@@ -1226,6 +1287,149 @@ window.copyAddress = () => {
     }
 };
 
+// ==========================================
+// 12. AIRDROP LOGIC
+// ==========================================
+
+window.openAirdropModal = () => {
+    if(!userAddress) return alert("Airdrop üçün cüzdanı qoşun!");
+    document.getElementById('airdropModalOverlay').style.display = 'flex';
+    document.getElementById('mainMenu').classList.remove('active');
+    checkAirdropStatus();
+};
+
+window.closeAirdropModal = () => {
+    document.getElementById('airdropModalOverlay').style.display = 'none';
+};
+
+window.startAirdropTimer = () => {
+    const input = document.getElementById('timerInput');
+    const mins = parseInt(input.value);
+    
+    if(!mins || mins <= 0) return alert("Düzgün dəqiqə daxil edin");
+    
+    const endTime = Date.now() + (mins * 60 * 1000);
+    localStorage.setItem('airdropEndTime', endTime);
+    localStorage.setItem('airdropActive', 'true');
+    
+    notify("Airdrop geri sayımı başladı!");
+    checkAirdropStatus();
+};
+
+function checkAirdropStatus() {
+    // 1. Check Total Claimed
+    const totalClaimed = parseInt(localStorage.getItem('totalClaimed') || '0');
+    document.getElementById('airdropStock').innerText = AIRDROP_LIMIT - totalClaimed;
+
+    // 2. Check User Limit
+    const userClaimed = localStorage.getItem(`claimed_${userAddress}`);
+    const btn = document.getElementById('claimAirdropBtn');
+
+    if (totalClaimed >= AIRDROP_LIMIT) {
+        btn.innerText = "Stok Bitdi ❌";
+        btn.disabled = true;
+        return;
+    }
+
+    if (userClaimed) {
+        btn.innerText = "Artıq almısınız ✅";
+        btn.disabled = true;
+        return;
+    }
+
+    // 3. Check Timer
+    if (airdropInterval) clearInterval(airdropInterval);
+    
+    const active = localStorage.getItem('airdropActive');
+    if (active !== 'true') {
+        btn.innerText = "Gözlənilir...";
+        btn.disabled = true;
+        document.getElementById('airdropTimer').innerText = "00:00:00";
+        return;
+    }
+
+    const endTime = parseInt(localStorage.getItem('airdropEndTime') || '0');
+
+    airdropInterval = setInterval(() => {
+        const now = Date.now();
+        const diff = endTime - now;
+
+        if (diff <= 0) {
+            // TIME IS UP -> ENABLE BUTTON
+            clearInterval(airdropInterval);
+            document.getElementById('airdropTimer').innerText = "00:00:00";
+            btn.innerText = "NFT AL (FREE) 🚀";
+            btn.disabled = false;
+        } else {
+            // COUNTDOWN RUNNING
+            const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            
+            document.getElementById('airdropTimer').innerText = 
+                `${hours.toString().padStart(2,'0')}:${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+            
+            btn.innerText = "Geri Sayım Gedir...";
+            btn.disabled = true;
+        }
+    }, 1000);
+}
+
+window.claimAirdrop = async () => {
+    if(!userAddress) return;
+    
+    const btn = document.getElementById('claimAirdropBtn');
+    btn.disabled = true;
+    btn.innerText = "Processing...";
+
+    // 1. Check Limits again
+    let total = parseInt(localStorage.getItem('totalClaimed') || '0');
+    if(total >= AIRDROP_LIMIT) return alert("Təəssüf ki, stok bitdi!");
+    
+    // 2. Random NFT Selection (Simulated)
+    // Real senarida bu backend API çağırışı olmalıdır
+    // Bura random bir tokenID tapıb onu transfer edirik
+    
+    try {
+        // Backend varsa:
+        /*
+        const res = await fetch(`${BACKEND_URL}/api/claim-airdrop`, {
+             method: "POST", 
+             body: JSON.stringify({ address: userAddress })
+        });
+        */
+
+        // Backend olmadigi ucun simulyasiya:
+        await new Promise(r => setTimeout(r, 2000)); // Fake delay
+        
+        // Simulyasiya: Metamask açılır (0 APE transfer) sadəcə təsdiq üçün
+        // Əgər kontrakt varsa `contract.claim()` olar.
+        // Burada boş tranzaksiya göndəririk ki, real görünsün:
+        const tx = await signer.sendTransaction({
+            to: userAddress, // Özünə 0 APE göndərir (Gas fee ödəyir)
+            value: 0
+        });
+        await tx.wait();
+
+        // Uğurlu
+        localStorage.setItem(`claimed_${userAddress}`, 'true');
+        localStorage.setItem('totalClaimed', (total + 1).toString());
+        
+        notify("Təbrik edirik! NFT qazandınız 🎉");
+        btn.innerText = "Artıq almısınız ✅";
+        
+        // Stok yenilə
+        checkAirdropStatus();
+
+    } catch (e) {
+        console.error(e);
+        alert("Xəta baş verdi: " + e.message);
+        btn.disabled = false;
+        btn.innerText = "NFT AL (FREE) 🚀";
+    }
+};
+
+
 // Initial Load
 loadData();
-window.loadNFTs = loadData; 
+window.loadNFTs = loadData;

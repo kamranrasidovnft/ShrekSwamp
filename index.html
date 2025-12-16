@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ApeChain Marketplace</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    /* =========================================
+       1. ÜMUMİ DİZAYN (RESET & VARS)
+       ========================================= */
+    :root {
+      --bg-color: #f3f5f8;
+      --card-bg: #ffffff;
+      --text-primary: #1a1d1e;
+      --text-secondary: #8a939b;
+      --accent-color: #3b82f6;
+      --accent-hover: #2563eb;
+      --green-color: #10b981;
+      --border-color: #eef2f6;
+      --glass-bg: rgba(255, 255, 255, 0.9);
+      
+      --legendary-color: #f97316;
+      --epic-color: #a855f7;
+      --rare-color: #3b82f6;
+      --common-color: #94a3b8;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* =========================================
+       2. NAVİGASİYA (NAVBAR)
+       ========================================= */
+    .navbar {
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      padding: 0 30px;
+    }
+
+    .nav-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        height: 70px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #1a1d1e 0%, #3b82f6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      cursor: pointer;
+    }
+
+    .nav-menu {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        padding: 10px 0;
+    }
+
+    .nav-link {
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 15px;
+        cursor: pointer;
+        padding: 8px 20px;
+        border-radius: 12px;
+        transition: 0.3s;
+        position: relative;
+    }
+
+    .nav-link:hover { background: #eef2f6; color: var(--text-primary); }
+    
+    .nav-link.active {
+        color: var(--accent-color);
+        background: rgba(59, 130, 246, 0.1);
+    }
+
+    .wallet-btn {
+        background: var(--accent-color); color: white; padding: 10px 24px;
+        border-radius: 30px; border: none; font-weight: 600; cursor: pointer;
+        transition: 0.2s; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    .wallet-btn:hover { transform: translateY(-2px); }
+
+    .disconnect-btn {
+        background: #fee2e2; color: #dc2626; display: none;
+    }
+    .disconnect-btn:hover { background: #fecaca; }
+
+    /* =========================================
+       3. SƏHİFƏLƏR (VIEWS)
+       ========================================= */
+    .view-section {
+        display: none;
+        padding: 30px;
+        max-width: 1400px;
+        margin: 0 auto;
+        animation: fadeIn 0.4s ease;
+    }
+    .view-section.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* --- HOME: ANALYTICS --- */
+    .dashboard-header {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;
+    }
+    .time-tabs { background: #e2e8f0; padding: 4px; border-radius: 12px; display: flex; }
+    .time-tab {
+        padding: 8px 16px; border-radius: 8px; border: none; background: transparent;
+        font-weight: 600; color: var(--text-secondary); cursor: pointer;
+    }
+    .time-tab.active { background: white; color: var(--text-primary); box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+    .analytics-table {
+        width: 100%; border-collapse: collapse; background: white;
+        border-radius: 20px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    }
+    .analytics-table th {
+        text-align: left; padding: 20px; color: var(--text-secondary);
+        font-size: 13px; text-transform: uppercase; border-bottom: 1px solid var(--border-color);
+    }
+    .analytics-table td { padding: 18px 20px; border-bottom: 1px solid var(--border-color); font-weight: 600; }
+    .analytics-table tr:hover { background: #f8fafc; }
+    .rank-num { color: var(--text-secondary); width: 30px; display: inline-block; }
+    .green-stat { color: var(--green-color); }
+    .red-stat { color: #ef4444; }
+
+    /* --- WALLET PAGE --- */
+    .wallet-grid { display: grid; grid-template-columns: 350px 1fr; gap: 30px; }
+    
+    .wallet-card {
+        background: white; border-radius: 24px; padding: 30px; height: fit-content;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    }
+    .balance-box {
+        background: linear-gradient(135deg, #3b82f6, #2563eb);
+        color: white; padding: 25px; border-radius: 20px; text-align: center; margin-bottom: 25px;
+        box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+    }
+    .balance-val { font-size: 32px; font-weight: 800; margin: 10px 0; }
+    
+    .w-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+    .w-tab { flex: 1; padding: 10px; border: 1px solid var(--border-color); background: white; border-radius: 10px; cursor: pointer; font-weight: 600; }
+    .w-tab.active { background: var(--text-primary); color: white; border-color: var(--text-primary); }
+
+    .transfer-inp { width: 100%; padding: 14px; margin-bottom: 10px; border-radius: 12px; border: 1px solid var(--border-color); box-sizing: border-box; }
+    .transfer-btn { width: 100%; padding: 14px; background: var(--accent-color); color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: 600; }
+
+    /* --- MARKETPLACE & NFT GRID --- */
+    .market-controls { display: flex; gap: 15px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
+    .filter-pill {
+        background: white; border: 1px solid var(--border-color); padding: 8px 20px;
+        border-radius: 30px; cursor: pointer; font-weight: 600; white-space: nowrap;
+    }
+    .filter-pill.active { background: var(--accent-color); color: white; border-color: var(--accent-color); }
+
+    .nft-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+    
+    .nft-card {
+        background: white; border-radius: 20px; overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.03); transition: 0.3s;
+        border: 2px solid transparent; display: flex; flex-direction: column;
+    }
+    .nft-card:hover { transform: translateY(-5px); box-shadow: 0 15px 30px rgba(0,0,0,0.08); }
+    
+    .nft-card.legendary { border-color: var(--legendary-color); }
+    .nft-card.epic { border-color: var(--epic-color); }
+    
+    .rarity-tag {
+        background: rgba(0,0,0,0.7); color: white; padding: 4px 10px;
+        font-size: 11px; font-weight: 800; text-transform: uppercase;
+        position: absolute; margin: 10px; border-radius: 6px;
+    }
+    .card-body { padding: 15px; display: flex; flex-direction: column; gap: 8px; flex-grow: 1;}
+    .card-name { font-weight: 700; }
+    .card-price { color: var(--accent-color); font-weight: 800; font-size: 18px; margin-top: auto; }
+    
+    .card-btn {
+        width: 100%; padding: 10px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; margin-top: 10px;
+    }
+    .btn-buy { background: var(--accent-color); color: white; }
+    .btn-list { background: white; border: 1px solid var(--border-color); color: var(--text-primary); }
+
+    /* --- FREE MINT --- */
+    .mint-wrapper { display: flex; justify-content: center; align-items: center; min-height: 60vh; text-align: center; }
+    .mint-box {
+        background: white; padding: 50px; border-radius: 30px; max-width: 500px; width: 100%;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+    }
+    .mint-icon { font-size: 60px; margin-bottom: 20px; display: block; }
+    .mint-btn {
+        width: 100%; padding: 20px; font-size: 18px; font-weight: 800; color: white;
+        background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 16px;
+        cursor: pointer; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);
+    }
+    .mint-btn:disabled { opacity: 0.6; cursor: wait; }
+
+    /* --- COMING SOON --- */
+    .cs-wrap { text-align: center; padding: 80px 0; color: #cbd5e1; }
+    .cs-title { font-size: 50px; font-weight: 900; }
+
+    /* RESPONSIVE */
+    @media (max-width: 800px) {
+        .wallet-grid { grid-template-columns: 1fr; }
+        .nav-menu { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-top">
+        <div class="logo">APE MARKET</div>
+        <div>
+            <button id="connectBtn" class="wallet-btn">Connect Wallet</button>
+            <button id="disconnectBtn" class="wallet-btn disconnect-btn">Disconnect</button>
+        </div>
+    </div>
+    <div class="nav-menu">
+        <div class="nav-link active" onclick="app.router('home')">Ana Ekran</div>
+        <div class="nav-link" onclick="app.router('wallet')">Cüzdan</div>
+        <div class="nav-link" onclick="app.router('marketplace')">Nft Kolleksiyası</div>
+        <div class="nav-link" onclick="app.router('mint')">Free Mint</div>
+        <div class="nav-link" onclick="app.router('airdrop')">Airdrop</div>
+        <div class="nav-link" onclick="app.router('info')">Məlumat</div>
+    </div>
+  </nav>
+
+  <section id="view-home" class="view-section active">
+      <div class="dashboard-header">
+          <h2 style="margin:0;">Top 50 Kolleksiya (ApeChain)</h2>
+          <div class="time-tabs">
+              <button class="time-tab active" onclick="app.dashTime('1d', this)">1 Gün</button>
+              <button class="time-tab" onclick="app.dashTime('7d', this)">7 Gün</button>
+              <button class="time-tab" onclick="app.dashTime('30d', this)">1 Ay</button>
+          </div>
+      </div>
+      <table class="analytics-table">
+          <thead>
+              <tr><th>#</th><th>Kolleksiya Adı</th><th>Həcm</th><th>Floor</th><th>Satışlar</th><th>Supply</th></tr>
+          </thead>
+          <tbody id="dashTableBody"></tbody>
+      </table>
+  </section>
+
+  <section id="view-wallet" class="view-section">
+      <div class="wallet-grid">
+          <div class="wallet-card">
+              <div class="balance-box">
+                  <div style="font-size:12px; text-transform:uppercase; opacity:0.8;">Ümumi Balans</div>
+                  <div class="balance-val" id="walletBal">0.00 APE</div>
+                  <div id="walletBalUsd" style="font-size:14px; opacity:0.9;">$0.00</div>
+                  <div id="walletAddr" style="margin-top:10px; font-family:monospace; background:rgba(255,255,255,0.2); padding:5px; border-radius:8px; font-size:12px;">0x...</div>
+              </div>
+
+              <div class="w-tabs">
+                  <button class="w-tab active" onclick="app.walletTab('send')">Göndər</button>
+                  <button class="w-tab" onclick="app.walletTab('receive')">Qəbul et</button>
+              </div>
+
+              <div id="tab-send">
+                  <input type="text" id="sendAddr" class="transfer-inp" placeholder="Alıcı adresi (0x...)">
+                  <input type="number" id="sendAmt" class="transfer-inp" placeholder="Məbləğ (APE)">
+                  <button class="transfer-btn" onclick="app.sendCoin()">GÖNDƏR 🚀</button>
+              </div>
+              <div id="tab-receive" style="display:none; text-align:center;">
+                  <img id="qrImg" src="" style="width:150px; border-radius:10px; margin-bottom:10px;">
+                  <p style="font-size:12px; color:#888;">Yalnız ApeChain (APE) göndərin</p>
+                  <button class="transfer-btn" style="background:#f1f5f9; color:#333;" onclick="app.copyAddr()">Adresi Kopyala</button>
+              </div>
+          </div>
+
+          <div>
+              <h2>Cüzdanımdakı NFT-lər</h2>
+              <div id="myNFTs" class="nft-grid">
+                  </div>
+          </div>
+      </div>
+  </section>
+
+  <section id="view-marketplace" class="view-section">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h2>Steptract Genesis Market</h2>
+          <select id="sortSelect" onchange="app.sortMarket(this.value)" style="padding:10px; border-radius:10px; border:1px solid #ddd;">
+              <option value="price_asc">Ucuzdan Bahaya</option>
+              <option value="price_desc">Bahadan Ucuza</option>
+              <option value="rarity_asc">Ən Nadir</option>
+          </select>
+      </div>
+
+      <div class="market-controls">
+          <button class="filter-pill active" onclick="app.filterMarket('all', this)">Hamısı</button>
+          <button class="filter-pill" onclick="app.filterMarket('listed', this)">Satışda olan</button>
+          <button class="filter-pill" onclick="app.filterMarket('unlisted', this)">Satışda olmayan</button>
+      </div>
+
+      <div id="marketGrid" class="nft-grid">
+          <div style="text-align:center; width:100%; grid-column:1/-1; padding:50px;">Yüklənir...</div>
+      </div>
+  </section>
+
+  <section id="view-mint" class="view-section">
+      <div class="mint-wrapper">
+          <div class="mint-box">
+              <span class="mint-icon">🎁</span>
+              <h1 style="font-size:32px; margin-bottom:10px;">Free Mint</h1>
+              <p style="color:#888; margin-bottom:30px;">Hər cüzdan üçün təsadüfi 1 NFT hədiyyə.</p>
+              
+              <button id="mintBtn" class="mint-btn" onclick="app.doFreeMint()">MINT NOW (FREE)</button>
+              <div id="mintResult" style="margin-top:20px; font-weight:bold;"></div>
+          </div>
+      </div>
+  </section>
+
+  <section id="view-airdrop" class="view-section">
+      <div class="cs-wrap">
+          <div class="cs-title">AIRDROP</div>
+          <div>COMING SOON...</div>
+      </div>
+  </section>
+
+  <section id="view-info" class="view-section">
+      <div class="cs-wrap">
+          <div class="cs-title">MƏLUMAT</div>
+          <div>COMING SOON...</div>
+      </div>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script type="module" src="/main.js"></script>
+</body>
+</html>
